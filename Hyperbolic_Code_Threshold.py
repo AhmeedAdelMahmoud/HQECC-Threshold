@@ -438,7 +438,6 @@ def get_edge_from_v1_v2(v1, v2, vertices_to_edges):
     return vertices_to_edges[tup]
 
 
-# This function needs to be corrected, v is unused and p is not defined.
 def find_all_plaquette_edges(periodic_graph, vertices_to_edges, p):
     plaquettes = nx.minimum_cycle_basis(periodic_graph)
     trivial_cycles = [pl for pl in plaquettes if len(pl) == p]
@@ -448,49 +447,48 @@ def find_all_plaquette_edges(periodic_graph, vertices_to_edges, p):
         plaquette_edges = []
         i = 0
         for _ in plaquette_vertices:
-            # print(plaquette_vertices)
             plaquette_edges.append(
                 get_edge_from_v1_v2(plaquette_vertices[i], plaquette_vertices[(i + 1) % p], vertices_to_edges))
             i = i + 1
-        # all_plaquette_edges.append((plaquette_vertices, plaquette_edges))
+        all_plaquette_edges.append((plaquette_vertices, plaquette_edges))
     return all_plaquette_edges
 
 
+def check_anti_commutativity(cycle1, cycle2):
+    """Check if two cycles commute based on common edges."""
+    edges1 = set(zip(cycle1, cycle1[1:] + [cycle1[0]]))  # Convert to set of edges
+    edges2 = set(zip(cycle2, cycle2[1:] + [cycle2[0]]))
+    common_edges = edges1 & edges2
+    return False if len(common_edges) % 2 == 0 else True
+
 # def check_commutativity(cycle1, cycle2):
-#     """Check if two cycles commute based on common edges."""
-#     edges1 = set(zip(cycle1, cycle1[1:] + [cycle1[0]]))  # Convert to set of edges
-#     edges2 = set(zip(cycle2, cycle2[1:] + [cycle2[0]]))
-#     common_edges = edges1 & edges2
-#     return "commute" if len(common_edges) % 2 == 0 else "anti_commute"
-
-def check_commutativity(cycle1, cycle2):
-    """
-    Checks whether two cycles commute or anti-commute based on the number of common edges.
-
-    Parameters:
-        cycle1 (list): List of vertices representing the first cycle.
-        cycle2 (list): List of vertices representing the second cycle.
-        G (networkx.Graph): The periodic graph where the cycles are defined.
-
-    Returns:
-        str: "commute" if the cycles commute, "anti-commute" if they anti-commute.
-    """
-    # Convert cycles into sets of edges
-    edges1 = {(cycle1[i], cycle1[(i + 1) % len(cycle1)]) for i in range(len(cycle1))}
-    edges2 = {(cycle2[i], cycle2[(i + 1) % len(cycle2)]) for i in range(len(cycle2))}
-
-    # Ensure edges are treated as undirected (i.e., (u, v) is the same as (v, u))
-    edges1 = {tuple(sorted(edge)) for edge in edges1}
-    edges2 = {tuple(sorted(edge)) for edge in edges2}
-
-    # Count common edges
-    common_edges = edges1.intersection(edges2)
-
-    # Check commutativity condition
-    if len(common_edges) % 2 == 0:
-        return "commute"
-    else:
-        return "anti-commute"
+#     """
+#     Checks whether two cycles commute or anti-commute based on the number of common edges.
+#
+#     Parameters:
+#         cycle1 (list): List of vertices representing the first cycle.
+#         cycle2 (list): List of vertices representing the second cycle.
+#         G (networkx.Graph): The periodic graph where the cycles are defined.
+#
+#     Returns:
+#         str: "commute" if the cycles commute, "anti-commute" if they anti-commute.
+#     """
+#     # Convert cycles into sets of edges
+#     edges1 = {(cycle1[i], cycle1[(i + 1) % len(cycle1)]) for i in range(len(cycle1))}
+#     edges2 = {(cycle2[i], cycle2[(i + 1) % len(cycle2)]) for i in range(len(cycle2))}
+#
+#     # Ensure edges are treated as undirected (i.e., (u, v) is the same as (v, u))
+#     edges1 = {tuple(sorted(edge)) for edge in edges1}
+#     edges2 = {tuple(sorted(edge)) for edge in edges2}
+#
+#     # Count common edges
+#     common_edges = edges1.intersection(edges2)
+#
+#     # Check commutativity condition
+#     if len(common_edges) % 2 == 0:
+#         return "commute"
+#     else:
+#         return "anti-commute"
 
 
 def find_maximal_commuting_subsets(cycles):
@@ -532,72 +530,73 @@ def code_distance_and_logical_operators(periodic_graph, p):
         if larger_lengths:
             code_distance = min(larger_lengths)
         else:
-            raise ValueError("No valid cycle length greater than p exists.")
+            raise ValueError("No valid cycle of length != p exists.")
 
     # Extract logical operators (cycles with length equal to code distance)
-    logical_operators = cycle_dict[code_distance]
+    logical_operators = [cycle for cycle in cycle_basis if len(cycle) != p]
 
-    # Check commutativity of logical operators
-    all_commute = all(
-        check_commutativity(logical_operators[i], logical_operators[j]) == "commute"
-        for i in range(len(logical_operators))
-        for j in range(i + 1, len(logical_operators))
-    )
-
-    # If not all commute, extract maximal mutually commuting subset
-    if not all_commute:
-        logical_operators = max(find_maximal_commuting_subsets(logical_operators), key=len)
+    # assert len(logical_operators) == 2 * (
+    #             N + 1), f"Unexpected number of cycles: found {len(logical_operators)}, expected {2 * (N + 1)}"
 
     return code_distance, logical_operators
 
 
-# def get_logical_error(affected_edges, correction_paths, all_plaquette_edges, vertices_to_edges, p):
-#
-#     affected_edges_set = set(affected_edges)
-#     all_correction_edges = set()
-#     for correction_path in correction_paths:
-#         for i in range(len(correction_path) - 1):
-#             all_correction_edges.add(get_edge_from_v1_v2(correction_path[i], correction_path[i + 1], vertices_to_edges))
-#     # print('correction_edg', sorted(all_correction_edges))
-#
-#     if all_correction_edges == affected_edges_set:
-#         return False
-#
-#     # remove the common edges between affected and correction edges
-#     intersection = all_correction_edges.intersection(affected_edges_set)
-#     union = all_correction_edges.union(affected_edges_set)
-#     potential_plaquettes = union - intersection
-#
-#     # print('potential_plaquettes', potential_plaquettes)
-#     # if something remains, check if they form plaquettes by looping over the 17 possible plaquettes
-#     if len(potential_plaquettes) % p != 0:
-#         return True
-#
-#     for _, v in all_plaquette_edges:
-#         if set(v).issubset(potential_plaquettes):
-#             potential_plaquettes -= set(v)
-#     if len(potential_plaquettes) > 0:
-#         return True
-#     return False
+def get_logical_error(affected_edges, correction_paths, vertices_to_edges, logical_operators):
 
-def get_logical_error(affected_edges, correction_paths,vertices_to_edges, logical_operators):
-
-    all_correction_edges = []
+    affected_edges_set = set(affected_edges)
+    all_correction_edges = set()
     for correction_path in correction_paths:
         for i in range(len(correction_path) - 1):
-            all_correction_edges.append(get_edge_from_v1_v2(correction_path[i], correction_path[i + 1], vertices_to_edges))
+            all_correction_edges.add(get_edge_from_v1_v2(correction_path[i], correction_path[i + 1], vertices_to_edges))
     # print('correction_edg', sorted(all_correction_edges))
 
-    if all_correction_edges == affected_edges:
+    if all_correction_edges == affected_edges_set:
         return False
 
+    # remove the common edges between affected and correction edges
+    intersection = all_correction_edges.intersection(affected_edges_set)
+    union = all_correction_edges.union(affected_edges_set)
+    potential_operators = list(union - intersection)
+
+
     for logical_operator in logical_operators:
-        for edge in logical_operator:
-            if edge not in all_correction_edges+affected_edges:
-                break
-        return True
+        if check_anti_commutativity(logical_operator, potential_operators):
+            return True
+
+
+    # # convert logical_opreators to edges
+    # logical_operators_edges = []
+    # for logical_operator in logical_operators:
+    #     edges = set()
+    #     for i in range(len(logical_operator)):
+    #         length = len(logical_operator)
+    #         edges.add(get_edge_from_v1_v2(logical_operator[i], logical_operator[(i+1)%length], vertices_to_edges))
+    #     logical_operators_edges.append(edges)
+
+    # for logical_operator in logical_operators_edges:
+    #     if logical_operator.issubset(potential_operators):
+    #         return True
 
     return False
+
+# def get_logical_error(affected_edges, correction_paths,vertices_to_edges, logical_operators):
+#
+#     all_correction_edges = []
+#     for correction_path in correction_paths:
+#         for i in range(len(correction_path) - 1):
+#             all_correction_edges.append(get_edge_from_v1_v2(correction_path[i], correction_path[i + 1], vertices_to_edges))
+#     # print('correction_edg', sorted(all_correction_edges))
+#
+#     if all_correction_edges == affected_edges:
+#         return False
+#
+#     for logical_operator in logical_operators:
+#         for edge in logical_operator:
+#             if edge not in all_correction_edges+affected_edges:
+#                 break
+#         return True
+#
+#     return False
 
 
 def run_trial(args):
@@ -614,7 +613,7 @@ def run_trial(args):
 
 
 def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
-    trials = 5
+    trials = 500
     error_percentages = []
     for ep in error_probabilities:
         print(f"Processing error probability {ep} for the graph with {periodic_graph.number_of_edges()} qubits")
@@ -661,20 +660,20 @@ if __name__ == '__main__':
              [8, 3, 6, 9, 12, 11, 2, 5, 1, 7, 10, 4],
              [9, 7, 2, 12, 8, 3, 10, 1, 4, 11, 6, 5]],
 
-        15: [[2, 7, 1, 10, 8, 3, 9, 6, 4, 13, 5, 15, 14, 12, 11],
-             [3, 1, 6, 9, 11, 8, 2, 5, 7, 4, 15, 14, 10, 13, 12],
-             [4, 10, 9, 12, 1, 7, 13, 2, 14, 15, 3, 8, 11, 5, 6],
-             [5, 8, 11, 1, 14, 15, 6, 12, 3, 2, 13, 4, 7, 9, 10],
-             [6, 3, 8, 7, 15, 5, 1, 11, 2, 9, 12, 13, 4, 10, 14],
-             [7, 9, 2, 13, 6, 1, 4, 3, 10, 14, 8, 11, 12, 15, 5],
-             [8, 6, 5, 2, 12, 11, 3, 15, 1, 7, 14, 10, 9, 4, 13],
-             [9, 4, 7, 14, 3, 2, 10, 1, 13, 12, 6, 5, 15, 11, 8]]
+        # 15: [[2, 7, 1, 10, 8, 3, 9, 6, 4, 13, 5, 15, 14, 12, 11],
+        #      [3, 1, 6, 9, 11, 8, 2, 5, 7, 4, 15, 14, 10, 13, 12],
+        #      [4, 10, 9, 12, 1, 7, 13, 2, 14, 15, 3, 8, 11, 5, 6],
+        #      [5, 8, 11, 1, 14, 15, 6, 12, 3, 2, 13, 4, 7, 9, 10],
+        #      [6, 3, 8, 7, 15, 5, 1, 11, 2, 9, 12, 13, 4, 10, 14],
+        #      [7, 9, 2, 13, 6, 1, 4, 3, 10, 14, 8, 11, 12, 15, 5],
+        #      [8, 6, 5, 2, 12, 11, 3, 15, 1, 7, 14, 10, 9, 4, 13],
+        #      [9, 4, 7, 14, 3, 2, 10, 1, 13, 12, 6, 5, 15, 11, 8]]
     }
 
-    plt.figure(figsize=(8, 6))  # Set figure size once before the loop
+    plt.figure(figsize=(10, 10))  # Set figure size once before the loop
 
     colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']  # Define different colors
-    error_probabilities = [0.02 * j for j in range(11)]
+    error_probabilities = [0.05 * j for j in range(15)]
     for idx, N in enumerate(CT_matrices_dic):
         graph_vertices = generate_vertices(p, q, p_B, q_B, N)
         sparse_matrix = create_adjacency_matrix(N, CT_matrices_dic[N], p_B, p, q)
