@@ -42,10 +42,8 @@ def unit_cell_positions(p: int, q: int):
             vertices_positions.append(r0 * np.exp(1j * np.pi * (2 * k) / p))
     return vertices_positions
 
-
 def rotation_matrix(phi: complex):
     return np.array([[np.exp(1j * phi / 2), 0], [0, np.exp(-1j * phi / 2)]])
-
 
 def fuchsian_generators(p_B: int, q_B: int):
     alpha = 2* np.pi/ p_B
@@ -58,7 +56,6 @@ def fuchsian_generators(p_B: int, q_B: int):
         FG_generators.append(gamma_j)
         FG_generators.append(np.linalg.inv(gamma_j))
     return FG_generators
-
 
 def create_new_vertex(vertex_position: complex, translation_matrix: np.array):
     v = translation_matrix @ np.array([vertex_position, 1])
@@ -149,7 +146,6 @@ def generate_vertices(p: int,q: int, p_B: int, q_B: int, N: int):
     final_vertices = unit_cell + outer_rings
     
     return final_vertices, redundant_indices
-
 
 # This function takes as input a list of vertices positions and a list of the indices of redundant vertices. It returns the following:
 # 1) The graph G constructed from these vertices.
@@ -244,25 +240,22 @@ def generate_hyperbolic_graph(vertices: list, redundant_indices: list, draw=Fals
 
     return G, Adj_G, vertices_to_edges, edges_to_vertices, pos_dict
 
-# Thus function takes as input a graph and a single node in that graph, and returns the labels of all edges incident on this node.
 def get_edge_labels_for_vertex(G: nx.Graph, vertex: int, vertices_to_edges: dict):
-    # Get all edges incident to the given vertex
+    """Takes as input a graph and a vertex label and returns the labels of all edges incident on this node."""
     incident_edges = list(G.edges(vertex))
-    # Retrieve the labels for these edges from the vertices_to_edges dictionary
     incident_edge_labels = {edge: vertices_to_edges[tuple(sorted(edge))] for edge in incident_edges}
     return incident_edge_labels.values()
 
-
-def get_edge_from_v1_v2(v1, v2, vertices_to_edges):
+def get_edge_from_v1_v2(v1: int, v2: int, vertices_to_edges: dict):
+    """Takes labels for two vertices for an edge and returns the corresponding edge label.
+    Edge labels are easier to work and debug with."""
     tup = tuple(sorted((v1, v2)))
     return vertices_to_edges[tup]
 
-# Kamal should start cleaning the code starting from here.
-def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list, N: int, CT: list , p_B: int, p: int, q: int):
+def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list, N: int, CT: list, p_B: int, p: int, q: int):
     print(f"The redundant vertices are {redundant_indices}")
     # Get a list of positions of vertices in the unit cell.
     unit_cell = unit_cell_positions(p, q)
-    # Number of vertices in the unit cell
     n = len(unit_cell) 
 
     # We use two different approaches to create the adjacency matrix of the periodic graph.
@@ -395,8 +388,9 @@ def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list,
         
     return sparse_matrix
 
-def add_periodicity_edges(original_graph, vertices_to_edges, edges_to_vertices, sparse_matrix, vertices_positions, draw=False):
+def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edges_to_vertices: dict, sparse_matrix: dict, vertices_positions: dict, draw=False):
     """
+    Finds all the new edges based on periodic boundary condition, then adds those edges to a copy of the original graph.
     1. Check if every nonzero element in the adjacency matrix of G is also in the sparse matrix file.
     2. If all edges in G exist in the file, add missing edges from the adjacency matrix file to G.
     """
@@ -446,36 +440,37 @@ def add_periodicity_edges(original_graph, vertices_to_edges, edges_to_vertices, 
     #     print("No additional edges were added to the graph.")
 
     if draw:
-        plt.figure(figsize=(20, 20))  # Adjust the width and height as needed
+        plt.figure(figsize=(20, 20))
         nx.draw(
             periodic_G,
             pos=vertices_positions,
-            node_size=20,  # Adjust node size
+            node_size=20,
             node_color="lightblue",
             with_labels=True,
-            font_size=6,  # adjust font size for node labels
+            font_size=6,
             font_color="black"
         )
         nx.draw_networkx_edge_labels(
             periodic_G,
             pos=vertices_positions,
             edge_labels=vertices_to_edges,
-            font_size=10,  # Increase font size for edge labels
-            label_pos=0.5,  # Adjust edge label position (closer to the center of edges)
+            font_size=10,
+            label_pos=0.5,
         )
     return periodic_G
 
-def generate_bit_flip_circuit(graph, error_prob, vertices_to_edges):
+def generate_bit_flip_circuit(graph: nx.Graph, error_prob: int, vertices_to_edges: dict):
+    """Takes the graph as input and generates the corresponding quantum circuit for bit flip error in Qiskit. 
+    The bit flip circuit applies a CX between each edge qubit and its incident vertices. 
+    A random X error is introduced randomly based on input error probability."""
+
     affected_edges = []
     num_vertices = len(graph.nodes())
     num_edges = len(graph.edges())
 
     vertices_qubits = QuantumRegister(num_vertices, 'vertices_qubits')
     edges_qubits = QuantumRegister(num_edges, 'edges_qubits')
-    # print(num_edges)
-    # print(num_vertices)
     cr = ClassicalRegister(num_vertices, 'cr')
-    # We will still add classical registers for plaquettes
     qc = QuantumCircuit()
     qc.add_register(vertices_qubits)
     qc.add_register(edges_qubits)
@@ -487,18 +482,9 @@ def generate_bit_flip_circuit(graph, error_prob, vertices_to_edges):
             qc.x(edges_qubits[j])
             affected_edges.append(j)
 
-    # for j in error_prob:
-    #     qc.x(edges_qubits[j])
-    #     affected_edges.append(j)
-    # print('affected_edges', affected_edges)
-
     for v in range(len(graph.nodes())):
         incident_edges = get_edge_labels_for_vertex(graph, v, vertices_to_edges)
         for edge in incident_edges:
-            # qc.h(edges_qubits[edge])
-            # qc.cx(edges_qubits[edge], vertices_qubits[v])
-            # qc.h(edges_qubits[edge])
-            # edges_qubits[edge]
             qc.cx(edges_qubits[edge], vertices_qubits[v])
 
         qc.barrier()
@@ -506,28 +492,16 @@ def generate_bit_flip_circuit(graph, error_prob, vertices_to_edges):
     for v in range(len(graph.nodes())):
         qc.measure(vertices_qubits[v], cr[v])
 
-    # qubits_of_interest = [edges_qubits[5], vertices_qubits[2], vertices_qubits[3], edges_qubits[149], vertices_qubits[130], vertices_qubits[131]]
-
-    # filtered_circuit = QuantumCircuit(*qubits_of_interest, cr[0], cr[1])
-
-    # # Copy only the instructions that involve the selected qubits
-    # for instruction in qc.data:
-    #     qubits, clbits = instruction[1], instruction[2]
-    #     if any(q in qubits_of_interest for q in qubits):
-    #         filtered_circuit.append(instruction[0], qubits, clbits)
-    #
-    # # Draw the filtered circuit
-    # filtered_circuit.draw("mpl")
-
     return qc, affected_edges
 
+def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p: int, q: int):
+    """Based on the Networkx implentation of minimum_cycle_basis. Find a cycle basis for the periodic graph
+    to ensure all cycles and logical operators are found."""
 
-def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
-    
     cycle_basis = []
     all_faces = []
     all_nodes = [node for node, degree in original_graph.degree() if degree < q] 
-     # We  extract the edges not in a spanning tree. We do not really need a
+    # We extract the edges not in a spanning tree. We do not really need a
     # *minimum* spanning tree. That is why we call the next function with
     # weight=None. Depending on implementation, it may be faster as well
     tree_edges = list(nx.minimum_spanning_edges(periodic_graph, data = False))
@@ -542,9 +516,7 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
     print(f"nx min cycle basis len {len(nx_cycle_basis)}")
     original_cycles_length = len(nx_cycle_basis)
     
-    
-
-    # Extracting plaquettes from the original graph.
+    # Step 1: Extracting plaquettes from the original graph.
     while len(cycle_basis) < original_cycles_length:
         for base in set_orth:
             for cycle in nx_cycle_basis:
@@ -555,7 +527,7 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
                     nx_cycle_basis.remove(cycle)
                     set_orth.remove(base)
                     # print(f"set-orth is {set_orth} \n")
-            # Update the set of vectors orthogonal to sofar found cycles
+                    # Update the set of vectors orthogonal to sofar found cycles
                     set_orth = [
                         ({e for e in orth if e not in base } | {e for e in base if e not in orth})
                          if sum((e in orth) for e in cycle_edges) % 2
@@ -568,14 +540,10 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
                 break
     
     print(f"The length of remaining cycles from the original graph is {len(nx_cycle_basis)}")    
-    
-    
+
     num_plaquettes = periodic_graph.number_of_edges()*2/p
     
-    
-    # 
-    # print(len(set_orth))
-  # Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
+   # Step 2: Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
     while len(all_faces) < num_plaquettes:
         cycle_edges = p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p)
         all_faces.append(cycle_edges)
@@ -583,16 +551,17 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
             cycle_basis.append(cycle_edges)
     print("len of cycle_basis after p_cycles", len(cycle_basis))
     
+    # Step 3: Find all non_trivial cycles (which form the logical operators)
     logical_operators = []
-    
     first_logical_operator, base_point = first_non_trivial_cycle_(periodic_graph,set_orth,all_faces)
     logical_operators.append(first_logical_operator)
     cycle_basis.append(first_logical_operator)
     
-
     while set_orth:
         cycle_edges = non_trivial_cycles(periodic_graph, set_orth, all_faces, base_point)
-        # sometimes non_trivial_cycle is None due to "Could not find extra cycles with basepoint"
+        # sometimes non_trivial_cycle is None due to "Could not find extra cycles with basepoint", 
+        # but this would cause an infinite for loop. Fix by adjusting the Coset Table.
+        # TODO: raise ValueError to prevent infinite loop
         if cycle_edges:
             logical_operators.append(cycle_edges)
             cycle_basis.append(cycle_edges)
@@ -600,8 +569,6 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
 
     print(f"len set_orth {len(set_orth)}")
 
-
-    
     if set_orth:
         raise ValueError("The number of cycles in the cycle basis is not E-V+1")
     print(f"The number of cycles in total is {len(cycle_basis)}")
@@ -612,10 +579,9 @@ def hyperbolic_cycle_basis(original_graph, periodic_graph, p, q):
     
     print("All logical operators are ", logical_operators)
     
-    return cycle_basis, all_faces, logical_operators
-        
+    return cycle_basis, all_faces, logical_operators      
             
-def p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p):    
+def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_plaquettes: int, all_nodes: list, p: int):    
     
     for base in set_orth:
         # Add 2 copies of each edge in G to Gi.
@@ -668,9 +634,7 @@ def p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p
         #     #     print(f"The {i} cycle is {cycle}")
         #     raise ValueError("No valid plaquette of length p was found in the graph.")
         # 
-    return chosen_plaquette
-    
-    
+    return chosen_plaquette   
     
 def valid_cycle_basis(cycle: list, S: dict, p: int):
     """
@@ -691,8 +655,7 @@ def valid_cycle_basis(cycle: list, S: dict, p: int):
     
     return valid_cycle, plaquette_edges
 
-
-def find_unique_paths_dfs(G, source, target, p):
+def find_unique_paths_dfs(G: nx.Graph, source: int, target: int, p: int):
     def dfs(node, path, length):
         if length == p:
             if node == target:
@@ -719,55 +682,54 @@ def find_unique_paths_dfs(G, source, target, p):
 
     return paths_list
 
-
-
-def first_non_trivial_cycle_(G, set_orth, all_faces):
-    
+def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
+    """This function is the same as non_trivial_cycles, but it stops after finding the first non_trivial_cycle
+    and returns a base point to be used to find the remaining non-trivial cycles, since they all should pass by a base point."""
     Gi = nx.Graph()
     
     for base in set_orth:
-            # Add 2 copies of each edge in G to Gi.
-            # If edge is in orth, add cross edge; otherwise in-plane edge
-            for u, v in G.edges():
-                if (u, v) in base or (v, u) in base:
-                    Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
-                else:
-                    Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
+        # Add 2 copies of each edge in G to Gi.
+        # If edge is in orth, add cross edge; otherwise in-plane edge
+        for u, v in G.edges():
+            if (u, v) in base or (v, u) in base:
+                Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
+            else:
+                Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
+    
+        # find the shortest length in Gi between n and (n, 1) for each n
+        # Note: Use "Gi_weight" for name of weight attribute
+        spl = nx.shortest_path_length
+        lift = {node: spl(Gi, source=node, target=(node, 1)) for node in G}
+        sorted_lift = dict(sorted(lift.items(), key=lambda item: item[1]))
         
-            # find the shortest length in Gi between n and (n, 1) for each n
-            # Note: Use "Gi_weight" for name of weight attribute
-            spl = nx.shortest_path_length
-            lift = {node: spl(Gi, source=node, target=(node, 1)) for node in G}
-            sorted_lift = dict(sorted(lift.items(), key=lambda item: item[1]))
-            
-            
-            found = False
-            for node, length in sorted_lift.items():
-                start = node
-                end = (start, 1)
-                potential_cycles = find_unique_paths_dfs(Gi, start, end, length)
-                for potential_path in potential_cycles:
-                    if potential_path not in all_faces:
-                        non_trivial_cycle = potential_path
-                        base_point = node
-                        set_orth.remove(base)
-                        set_orth = [
-                                ({e for e in orth if e not in base } | {e for e in base if e not in orth})
-                                 if sum((e in orth) for e in non_trivial_cycle) % 2
-                                
-                                else orth
-                                for orth in set_orth
-                                        ]
-                        found = True
-                        break
-                if found:
+        
+        found = False
+        for node, length in sorted_lift.items():
+            start = node
+            end = (start, 1)
+            potential_cycles = find_unique_paths_dfs(Gi, start, end, length)
+            for potential_path in potential_cycles:
+                if potential_path not in all_faces:
+                    non_trivial_cycle = potential_path
+                    base_point = node
+                    set_orth.remove(base)
+                    set_orth = [
+                            ({e for e in orth if e not in base } | {e for e in base if e not in orth})
+                                if sum((e in orth) for e in non_trivial_cycle) % 2
+                            
+                            else orth
+                            for orth in set_orth
+                                    ]
+                    found = True
                     break
             if found:
                 break
+        if found:
+            break
     
     return non_trivial_cycle, base_point
 
-def non_trivial_cycles(G, set_orth, all_faces, base_point):
+def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point: int):
     """
     Computes the minimum weight cycle in G,
     orthogonal to the vector orth as per [p. 338, 1]
@@ -816,8 +778,8 @@ def non_trivial_cycles(G, set_orth, all_faces, base_point):
     
     return non_trivial_cycle
 
-
-def logical_operators_to_edges(logical_operators, vertices_to_edges):
+def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict):
+    """Convert logical operators from a list of pairs of vertices (v1,v2) to edge labels."""
     logical_operators_edges = []
     # print("looping over logical_operators", logical_operators)
     for logical_operator in logical_operators:
@@ -831,12 +793,8 @@ def logical_operators_to_edges(logical_operators, vertices_to_edges):
         # print("Logical operator edges is", lg_edges)
     return logical_operators_edges
 
-        
-        
-
-
-def generate_dual_graph(all_faces, p, draw= False):
-    
+def generate_dual_graph(all_faces: list, p: int, draw=False):
+    """Generate the dual graph which replaces each plaquette with a vertix. Used for computing the phase flip circuit."""
     G_dual_graph = nx.Graph()
     
     for i, plaquette in enumerate(all_faces):
@@ -880,7 +838,7 @@ def generate_dual_graph(all_faces, p, draw= False):
         
     return G_dual_graph, intersection_edges
 
-def generate_phase_flip_circuit(periodic_G, all_faces, graph_vertices_to_edges, err_prob):
+def generate_phase_flip_circuit(periodic_G: nx.Graph, all_faces: list, graph_vertices_to_edges: dict, err_prob: float):
     affected_edges = []
     num_plaquettes = len(all_faces)
     print('num_vertices', num_plaquettes)
@@ -940,8 +898,7 @@ def generate_phase_flip_circuit(periodic_G, all_faces, graph_vertices_to_edges, 
 
     return qc, affected_edges
 
-
-def generate_syndrome_graph(indices, graph, draw = False):
+def generate_syndrome_graph(indices: list, graph: nx.Graph, draw=False):
     syndrome_graph = nx.Graph()
     for v in indices:
         syndrome_graph.add_node(v, label = True)
@@ -964,7 +921,9 @@ def generate_syndrome_graph(indices, graph, draw = False):
         plt.show()
     return syndrome_graph
 
-def find_correction_paths(syndrome_graph, circuit_graph):
+def find_correction_paths(syndrome_graph: nx.Graph, periodic_graph: nx.Graph):
+    # Find the MWPM from the syndrome graph because edges are weights, 
+    # then find the actual correction path using the periodic graph because syndrom graph doesnt contain all nodes
     matching = nx.algorithms.matching.min_weight_matching(syndrome_graph)
 
     correction_paths = []
@@ -972,12 +931,12 @@ def find_correction_paths(syndrome_graph, circuit_graph):
     # print("Minimum Weight Perfect Matching:", matching)
     for edge in matching:
         # print(edge, "with weight", syndrome_graph.edges[edge]['weight'])
-        path = nx.shortest_path(circuit_graph, source=edge[0], target=edge[1])
+        path = nx.shortest_path(periodic_graph, source=edge[0], target=edge[1])
         # print('path', path)
         correction_paths.append(path)
     return correction_paths
 
-def get_logical_error(affected_edges, correction_paths, vertices_to_edges, logical_operators):
+def get_logical_error(affected_edges: list, correction_paths: list, vertices_to_edges: dict, logical_operators: list):
     
     logical_operators_edges = logical_operators_to_edges(logical_operators, vertices_to_edges)
     
@@ -996,12 +955,10 @@ def get_logical_error(affected_edges, correction_paths, vertices_to_edges, logic
     union = all_correction_edges.union(affected_edges_set)
     potential_logical_error = union - intersection
     
-    
     for logical_operator in logical_operators_edges:
         common_edges = potential_logical_error.intersection(logical_operator)
         if len(common_edges) % 2 == 1:
             return True
-    
     
     return False
 
@@ -1016,7 +973,6 @@ def run_trial(args):
     correction_paths = find_correction_paths(syndrome_graph, periodic_graph)
     is_err = get_logical_error(affected_edges, correction_paths, vertices_to_edges, logical_operators)
     return is_err
-
 
 def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
     trials = 10
@@ -1269,9 +1225,6 @@ if __name__ == '__main__':
               [  15,  11,  13,   9,   7,   4,  25,   5,  24,   3,  21,   2,  23,   1,  22,  10,  14,  12,   8,   6,  18,  17,  16,  20,  19 ] ]}
     else:
         raise ValueError("Invalid value for p_B")
-
-
-# Make sure that all non-trivial cycles pass by a base point.
     
     plt.figure(figsize=(10, 10))  # Set figure size once before the loop
 
