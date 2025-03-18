@@ -577,7 +577,7 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     # for idx, cycle in enumerate(non_trivial_cycles_):
     #     print(f"The non_trivial cycle {idx} is {cycle}")
     
-    print("All logical operators are ", logical_operators)
+    # print("All logical operators are ", logical_operators)
     
     return cycle_basis, all_faces, logical_operators      
             
@@ -793,12 +793,43 @@ def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict)
         # print("Logical operator edges is", lg_edges)
     return logical_operators_edges
 
-def generate_dual_graph(all_faces: list, p: int, draw=False):
+def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_dict: dict, draw=False):
     """Generate the dual graph which replaces each plaquette with a vertix. Used for computing the phase flip circuit."""
     G_dual_graph = nx.Graph()
+
+
+    pos_dict = {}
     
+    ###### 
+    # For testing only
+    new_all_faces = []
+    for face in all_faces:
+        plaquette_edges = OrderedSet()
+        for i in range(len(face)):
+            u, v = face[i], face[(i + 1) %p]
+            plaquette_edges.add(tuple(sorted((u, v))))
+        new_all_faces.append(plaquette_edges)
+
+    all_faces = new_all_faces
+    ######
+
     for i, plaquette in enumerate(all_faces):
-        G_dual_graph.add_node(i, label = True)
+        plaquette_vertices = set()
+        for pair in plaquette:
+            plaquette_vertices.add(pair[0])
+            plaquette_vertices.add(pair[1])
+        
+        x_pos = 0.0
+        y_pos = 0.0
+        for v in plaquette_vertices:
+            x_pos += G_pos_dict[v][0]
+            y_pos += G_pos_dict[v][1]
+        x_pos = x_pos/p
+        y_pos = y_pos/p
+        pos = (x_pos, y_pos)
+        pos_dict[i] = pos
+
+        G_dual_graph.add_node(i, pos=pos, label = True)
         
     intersection_edges = {}
     
@@ -806,11 +837,11 @@ def generate_dual_graph(all_faces: list, p: int, draw=False):
         for j, cycle2 in enumerate(all_faces[i+1:], start=i+1):
             intersection = list(cycle1.intersection(cycle2))
             if len(intersection) == 1:
-                G_dual_graph.add_edge(i, j, label = True)
+                G_dual_graph.add_edge(i, j, label=True)
                 # print(f"The first cycle is {cycle1}")
                 # print(f"The second cycle is {cycle2}")
                 # print(f"The inersection between the two cycles is {intersection}")
-                intersection_edges[(i,j)] = intersection
+                intersection_edges[(i,j)] = get_edge_from_v1_v2(intersection[0][0],intersection[0][1], vertices_to_edges)
             elif len(intersection) == 0:
                 continue
             else:
@@ -818,13 +849,24 @@ def generate_dual_graph(all_faces: list, p: int, draw=False):
                 # print(f"The second cycle is {cycle2}")
                 # print(f"The inersection between the two cycles is {intersection}")
                 raise ValueError(f"The intersection between two faces {i} and {j} is {len(cycle1.intersection(cycle2))}")
-                
+    print("intersection_edges", intersection_edges)
+
+    # Verify that each vertex is present exactly p times
+    # count = {}
+    # for i in range(len(all_faces)):
+    #     count[i] = 0
+    # for pair in intersection_edges.keys():
+    #     count[pair[0]] += 1
+    #     count[pair[1]] += 1
+    # if not all(c == p for c in count.values()):
+    #     raise Exception("Some vertices in dual graph do not exist exactly p times")
+
     if draw:
         plt.figure(figsize=(10, 10))  # Adjust the width and height as needed
         # Draw the graph
         nx.draw(
             G_dual_graph,
-            pos=nx.spectral_layout(G_dual_graph) ,
+            pos=pos_dict,
             node_size=20,  # Adjust node size
             node_color="lightblue",
             with_labels=True,
@@ -833,8 +875,8 @@ def generate_dual_graph(all_faces: list, p: int, draw=False):
                 )
         
     node_degrees = [deg for node, deg in G_dual_graph.degree() if deg != p]
-    if node_degrees:
-        raise ValueError(f"Some nodes in the dual graph do not have {p} neighbours")
+    # if node_degrees:
+    #     raise ValueError(f"Some nodes in the dual graph do not have {p} neighbours")
         
     return G_dual_graph, intersection_edges
 
@@ -988,10 +1030,10 @@ def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_
     return error_percentages
 
 if __name__ == '__main__':
-    p = 14
+    p = 8
     q = 3
-    p_B = 14
-    q_B = 7
+    p_B = 8
+    q_B = 8
     # N = 9
     
     if p_B == 8:
@@ -1020,29 +1062,29 @@ if __name__ == '__main__':
             #       [ 9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3 ] ],
             
             # Abelian Subgroup, NSG[2782]
-            12: [ [   2,  10,   1,   8,  11,   9,  12,   7,   5,   4,   3,   6 ],
-  [   3,   1,  11,  10,   9,  12,   8,   4,   6,   2,   5,   7 ],
-  [   4,   8,  10,  12,   1,  11,   9,   6,   3,   7,   2,   5 ],
-  [   5,  11,   9,   1,  12,   8,  10,   2,   7,   3,   6,   4 ],
-  [   6,   9,  12,  11,   8,  10,   1,   3,   4,   5,   7,   2 ],
-  [   7,  12,   8,   9,  10,   1,  11,   5,   2,   6,   4,   3 ],
-  [   8,   7,   4,   6,   2,   3,   5,   9,   1,  12,  10,  11 ],
-  [   9,   5,   6,   3,   7,   4,   2,   1,   8,  11,  12,  10 ] ],
+#             12: [ [   2,  10,   1,   8,  11,   9,  12,   7,   5,   4,   3,   6 ],
+#   [   3,   1,  11,  10,   9,  12,   8,   4,   6,   2,   5,   7 ],
+#   [   4,   8,  10,  12,   1,  11,   9,   6,   3,   7,   2,   5 ],
+#   [   5,  11,   9,   1,  12,   8,  10,   2,   7,   3,   6,   4 ],
+#   [   6,   9,  12,  11,   8,  10,   1,   3,   4,   5,   7,   2 ],
+#   [   7,  12,   8,   9,  10,   1,  11,   5,   2,   6,   4,   3 ],
+#   [   8,   7,   4,   6,   2,   3,   5,   9,   1,  12,  10,  11 ],
+#   [   9,   5,   6,   3,   7,   4,   2,   1,   8,  11,  12,  10 ] ],
 
                   
          
             
             
                     
-            # Abelian Subgroup, NSG[10425]
-            16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
-                  [ 3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9 ], 
-                  [ 4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12 ], 
-                  [ 5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13 ], 
-                  [ 6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14 ], 
-                  [ 7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11 ], 
-                  [ 8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2 ], 
-                  [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
+#             # Abelian Subgroup, NSG[10425]
+#             16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
+#                   [ 3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9 ], 
+#                   [ 4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12 ], 
+#                   [ 5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13 ], 
+#                   [ 6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14 ], 
+#                   [ 7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11 ], 
+#                   [ 8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2 ], 
+#                   [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
             }
         
     elif p_B == 10:
@@ -1234,32 +1276,39 @@ if __name__ == '__main__':
         G_vertices, redundant_vertices = generate_vertices(p, q, p_B, q_B, N)
         print("redundant_vertices", redundant_vertices)
         
-        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, redundant_vertices, draw = False)
+        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, redundant_vertices, draw=False)
         
         sparse_matrix = create_adjacency_matrix(adj_G, redundant_vertices, N, CT_matrices_dic[N], p_B, p, q)
         
         periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict)
         
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
+        print("og all_faces", all_faces)
         
-        # dual_graph, intersection_edges = generate_dual_graph(all_faces, p, draw= False)
+        ###### 
+        # For testing only
+        all_cycles = nx.minimum_cycle_basis(G)
+        plaquettes = [cycle for cycle in all_cycles if len(cycle) == p]
+        dual_graph, intersection_edges = generate_dual_graph(plaquettes, p, G_vertices_to_edges, G_pos_dict, draw=True)
+        ######
+        # dual_graph, intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=True)
         
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         
-        error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
+        # error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
         
-        plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
-                 color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
+        # plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
+                #  color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
 
 
     # Add labels and a title
-    plt.xlabel('Error Probabilities')
-    plt.ylabel('Error Percentages')
-    plt.title('Error Threshold Graph')
-    plt.legend()
-    plt.grid(True)
+    # plt.xlabel('Error Probabilities')
+    # plt.ylabel('Error Percentages')
+    # plt.title('Error Threshold Graph')
+    # plt.legend()
+    # plt.grid(True)
     plt.show()  # Show all curves in one figure
     end = time.time()
     print(end - start)
