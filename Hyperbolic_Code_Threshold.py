@@ -511,38 +511,40 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     # Recall that every cycle C (and every witness S) is given as a vector in the chords, that is every cycle (and every witness S) is given as a vector v \in {0,1}^N
     set_orth = [{tuple(sorted(edge))} for edge in chords]
     print(f"The initial length of the set_orth is {len(set_orth)}")
+   # print(f"The initial set_orth is {set_orth}")
     # print("initial set_orth", set_orth)
     nx_cycle_basis = nx.minimum_cycle_basis(original_graph)
+    print("nx_cycle_basis", nx_cycle_basis)
     print(f"nx min cycle basis len {len(nx_cycle_basis)}")
     original_cycles_length = len(nx_cycle_basis)
     
     # Step 1: Extracting plaquettes from the original graph.
     while len(cycle_basis) < original_cycles_length:
-        for base in set_orth:
-            for cycle in nx_cycle_basis:
-                valid_cycles, cycle_edges = valid_cycle_basis(cycle, base, p)
-                if valid_cycles:
-                    cycle_basis.append(cycle_edges)
-                    all_faces.append(cycle_edges) 
-                    nx_cycle_basis.remove(cycle)
-                    set_orth.remove(base)
-                    # print(f"set-orth is {set_orth} \n")
-                    # Update the set of vectors orthogonal to sofar found cycles
-                    set_orth = [
-                        ({e for e in orth if e not in base } | {e for e in base if e not in orth})
-                         if sum((e in orth) for e in cycle_edges) % 2
-                        
-                        else orth
-                        for orth in set_orth
-                                ]
+        for i, base in enumerate(set_orth):
+            # print(f"{i}, current base {base}, current cycle {nx_cycle_basis[0]}, current set_orth {set_orth}")
+            valid_cycles, cycle_edges = valid_cycle_basis(nx_cycle_basis[0], base, p)
+            if valid_cycles:
+                cycle_basis.append(cycle_edges)
+                all_faces.append(cycle_edges) 
+                nx_cycle_basis.remove(nx_cycle_basis[0])
+                set_orth.remove(base)
+                # print(f"removed {base} from {set_orth} \n")
+                # Update the set of vectors orthogonal to sofar found cycles
+                set_orth = [
+                    ({e for e in orth if e not in base } | {e for e in base if e not in orth})
+                        if sum((e in orth) for e in cycle_edges) % 2
                     
-                    break
+                    else orth
+                    for orth in set_orth
+                            ]
                 break
     
     print(f"The length of remaining cycles from the original graph is {len(nx_cycle_basis)}")    
 
     num_plaquettes = periodic_graph.number_of_edges()*2/p
+    print("num_plaquettes", num_plaquettes)
     
+    print("len(set_orth) before p_cycles", len(set_orth))
    # Step 2: Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
     while len(all_faces) < num_plaquettes:
         cycle_edges = p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p)
@@ -557,6 +559,7 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     logical_operators.append(first_logical_operator)
     cycle_basis.append(first_logical_operator)
     
+    print("len(set_orth) before non_trivial", len(set_orth))
     while set_orth:
         cycle_edges = non_trivial_cycles(periodic_graph, set_orth, all_faces, base_point)
         # sometimes non_trivial_cycle is None due to "Could not find extra cycles with basepoint", 
@@ -799,20 +802,8 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
 
 
     pos_dict = {}
-    
-    ###### 
-    # For testing only
-    new_all_faces = []
-    for face in all_faces:
-        plaquette_edges = OrderedSet()
-        for i in range(len(face)):
-            u, v = face[i], face[(i + 1) %p]
-            plaquette_edges.add(tuple(sorted((u, v))))
-        new_all_faces.append(plaquette_edges)
 
-    all_faces = new_all_faces
-    ######
-
+    # For each face in graph, add a node to dual graph with its position at the average of all the face's nodes
     for i, plaquette in enumerate(all_faces):
         plaquette_vertices = set()
         for pair in plaquette:
@@ -837,11 +828,13 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
         for j, cycle2 in enumerate(all_faces[i+1:], start=i+1):
             intersection = list(cycle1.intersection(cycle2))
             if len(intersection) == 1:
-                G_dual_graph.add_edge(i, j, label=True)
+                label = get_edge_from_v1_v2(intersection[0][0],intersection[0][1], vertices_to_edges)
+                G_dual_graph.add_edge(i, j, label=label)
+                # vertices_to_edges[(i, j)] = edge_count
                 # print(f"The first cycle is {cycle1}")
                 # print(f"The second cycle is {cycle2}")
                 # print(f"The inersection between the two cycles is {intersection}")
-                intersection_edges[(i,j)] = get_edge_from_v1_v2(intersection[0][0],intersection[0][1], vertices_to_edges)
+                intersection_edges[(i,j)] = label
             elif len(intersection) == 0:
                 continue
             else:
@@ -849,7 +842,6 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
                 # print(f"The second cycle is {cycle2}")
                 # print(f"The inersection between the two cycles is {intersection}")
                 raise ValueError(f"The intersection between two faces {i} and {j} is {len(cycle1.intersection(cycle2))}")
-    print("intersection_edges", intersection_edges)
 
     # Verify that each vertex is present exactly p times
     # count = {}
@@ -872,7 +864,16 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
             with_labels=True,
             font_size=12,  # Increase font size for node labels
             font_color="black"
-                )
+            )
+        nx.draw_networkx_edge_labels(
+            G_dual_graph,
+            pos=pos_dict,
+            edge_labels=intersection_edges,
+            font_size=10,
+            label_pos=0.5,
+        )
+        plt.show()
+
         
     node_degrees = [deg for node, deg in G_dual_graph.degree() if deg != p]
     # if node_degrees:
@@ -1283,32 +1284,44 @@ if __name__ == '__main__':
         periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict)
         
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
-        print("og all_faces", all_faces)
+        # print("og all_faces", all_faces)
         
-        ###### 
-        # For testing only
         all_cycles = nx.minimum_cycle_basis(G)
         plaquettes = [cycle for cycle in all_cycles if len(cycle) == p]
-        dual_graph, intersection_edges = generate_dual_graph(plaquettes, p, G_vertices_to_edges, G_pos_dict, draw=True)
-        ######
-        # dual_graph, intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=True)
+        original_faces = []
+        for face in plaquettes:
+            plaquette_edges = OrderedSet()
+            for i in range(len(face)):
+                u, v = face[i], face[(i + 1) %p]
+                plaquette_edges.add(tuple(sorted((u, v))))
+            original_faces.append(plaquette_edges)
+
+        original_dual_graph, original_intersection_edges = generate_dual_graph(original_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
         
+        periodic_dual_graph, periodic_intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
+        print("periodic_dual_graph.number_of_nodes()", periodic_dual_graph.number_of_nodes())
+        print("original_intersection_edges", original_intersection_edges)
+        print("periodic_intersection_edges", periodic_intersection_edges)
+        HCB_dual, _, logical_operators_dual = hyperbolic_cycle_basis(original_dual_graph, periodic_dual_graph, q, p)
+        # print("logical_operators_dual", logical_operators_dual)
+        # exit()
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         
+        error_percentage = error_graph(periodic_dual_graph, periodic_intersection_edges, error_probabilities, logical_operators_dual)
         # error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
         
-        # plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
-                #  color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
+        plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
+                 color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
 
 
     # Add labels and a title
-    # plt.xlabel('Error Probabilities')
-    # plt.ylabel('Error Percentages')
-    # plt.title('Error Threshold Graph')
-    # plt.legend()
-    # plt.grid(True)
+    plt.xlabel('Error Probabilities')
+    plt.ylabel('Error Percentages')
+    plt.title('Error Threshold Graph')
+    plt.legend()
+    plt.grid(True)
     plt.show()  # Show all curves in one figure
     end = time.time()
     print(end - start)
