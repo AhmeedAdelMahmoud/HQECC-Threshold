@@ -555,19 +555,30 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     
     # Step 3: Find all non_trivial cycles (which form the logical operators)
     logical_operators = []
-    first_logical_operator, base_point = first_non_trivial_cycle_(periodic_graph,set_orth,all_faces)
+    first_logical_operator = first_non_trivial_cycle_(periodic_graph,set_orth,all_faces)
     logical_operators.append(first_logical_operator)
     cycle_basis.append(first_logical_operator)
-    
+
+
+    first_operator_vertices = set()
+    for u, v in first_logical_operator:
+        first_operator_vertices.add(u)
+        first_operator_vertices.add(v)
+
     print("len(set_orth) before non_trivial", len(set_orth))
-    while set_orth:
-        cycle_edges = non_trivial_cycles(periodic_graph, set_orth, all_faces, base_point)
-        # sometimes non_trivial_cycle is None due to "Could not find extra cycles with basepoint", 
-        # but this would cause an infinite for loop. Fix by adjusting the Coset Table.
-        # TODO: raise ValueError to prevent infinite loop
-        if cycle_edges:
-            logical_operators.append(cycle_edges)
-            cycle_basis.append(cycle_edges)
+    for base_point in first_operator_vertices:
+        set_orth_copy = copy.deepcopy(set_orth)
+        found_logical_operators = []
+        while set_orth_copy:
+            cycle_edges, base_point_error = non_trivial_cycles(periodic_graph, set_orth_copy, all_faces, base_point)
+            if base_point_error:
+                break
+            found_logical_operators.append(cycle_edges)
+    set_orth = set_orth_copy
+    logical_operators.extend(found_logical_operators)
+    cycle_basis.extend(found_logical_operators)
+    print("len(logical_operators)", len(logical_operators))
+        
     print("length of logical_op after non_trivia_cycles", len(logical_operators))
 
     print(f"len set_orth {len(set_orth)}")
@@ -714,7 +725,7 @@ def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
             for potential_path in potential_cycles:
                 if potential_path not in all_faces:
                     non_trivial_cycle = potential_path
-                    base_point = node
+                    #base_point = node
                     set_orth.remove(base)
                     set_orth = [
                             ({e for e in orth if e not in base } | {e for e in base if e not in orth})
@@ -730,7 +741,7 @@ def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
         if found:
             break
     
-    return non_trivial_cycle, base_point
+    return non_trivial_cycle
 
 def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point: int):
     """
@@ -741,8 +752,9 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
     
     Gi = nx.Graph()
 
-
     found = False
+    error = False
+    non_trivial_cycle = None
     for base in set_orth:
         # Add 2 copies of each edge in G to Gi.
         # If edge is in orth, add cross edge; otherwise in-plane edge
@@ -751,12 +763,11 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
                 Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
             else:
                 Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
-  
+
         start = base_point
         end = (start, 1)
         length = nx.shortest_path_length(Gi, start, end)
         potential_cycles = find_unique_paths_dfs(Gi, start, end, length)
-        non_trivial_cycle = None
         for potential_path in potential_cycles:
             # Should we also put the condition if potential_path not in cycle_basis to avoid double counting?
             if potential_path not in all_faces:
@@ -764,7 +775,7 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
                 set_orth.remove(base)
                 set_orth = [
                         ({e for e in orth if e not in base } | {e for e in base if e not in orth})
-                         if sum((e in orth) for e in non_trivial_cycle) % 2
+                        if sum((e in orth) for e in non_trivial_cycle) % 2
                         
                         else orth
                         for orth in set_orth
@@ -777,9 +788,10 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
     # print(base_point)
     if not found:
         print(f"The number of remaining chords is {len(set_orth)}")
-        raise ValueError(f"Could not find extra cycles with basepoint {base_point}")
+        error = True
+        # raise ValueError(f"Could not find extra cycles with basepoint {base_point}")
     
-    return non_trivial_cycle
+    return non_trivial_cycle, error
 
 def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict):
     """Convert logical operators from a list of pairs of vertices (v1,v2) to edge labels."""
@@ -1018,7 +1030,7 @@ def run_trial(args):
     return is_err
 
 def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
-    trials = 10
+    trials = 2
     error_percentages = []
     for ep in error_probabilities:
         print(f"Processing error probability {ep} for the graph with {periodic_graph.number_of_edges()} qubits")
@@ -1053,14 +1065,14 @@ if __name__ == '__main__':
             
             
             # Abelian Subgroup, NSG[2872]
-            # 12: [ [ 2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8 ], 
-            #       [ 3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9 ], 
-            #       [ 4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5 ], 
-            #       [ 5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4 ], 
-            #       [ 6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11 ], 
-            #       [ 7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10 ], 
-            #       [ 8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2 ], 
-            #       [ 9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3 ] ],
+            12: [ [ 2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8 ], 
+                  [ 3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9 ], 
+                  [ 4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5 ], 
+                  [ 5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4 ], 
+                  [ 6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11 ], 
+                  [ 7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10 ], 
+                  [ 8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2 ], 
+                  [ 9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3 ] ],
             
             # Abelian Subgroup, NSG[2782]
 #             12: [ [   2,  10,   1,   8,  11,   9,  12,   7,   5,   4,   3,   6 ],
@@ -1072,20 +1084,28 @@ if __name__ == '__main__':
 #   [   8,   7,   4,   6,   2,   3,   5,   9,   1,  12,  10,  11 ],
 #   [   9,   5,   6,   3,   7,   4,   2,   1,   8,  11,  12,  10 ] ],
 
-                  
+            # Coset Table for the Abelian Subgroup at Index 3426: # d=8
+            # 12: [ [   2,  10,   1,   9,  11,  12,   8,   5,   6,   4,   3,   7 ],
+            #   [   3,   1,  11,  10,   8,   9,  12,   7,   4,   2,   5,   6 ],
+            #   [   4,   9,  10,  12,   1,   8,  11,   3,   7,   6,   2,   5 ],
+            #   [   5,  11,   8,   1,  12,  10,   9,   6,   2,   3,   7,   4 ],
+            #   [   6,  12,   9,   8,  10,  11,   1,   2,   5,   7,   4,   3 ],
+            #   [   7,   8,  12,  11,   9,   1,  10,   4,   3,   5,   6,   2 ],
+            #   [   8,   5,   7,   3,   6,   2,   4,   9,   1,  11,  12,  10 ],
+            #   [   9,   6,   4,   7,   2,   5,   3,   1,   8,  12,  10,  11 ] ],
          
             
             
                     
 #             # Abelian Subgroup, NSG[10425]
-#             16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
-#                   [ 3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9 ], 
-#                   [ 4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12 ], 
-#                   [ 5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13 ], 
-#                   [ 6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14 ], 
-#                   [ 7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11 ], 
-#                   [ 8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2 ], 
-#                   [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
+            16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
+                  [ 3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9 ], 
+                  [ 4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12 ], 
+                  [ 5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13 ], 
+                  [ 6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14 ], 
+                  [ 7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11 ], 
+                  [ 8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2 ], 
+                  [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
             }
         
     elif p_B == 10:
@@ -1296,21 +1316,21 @@ if __name__ == '__main__':
                 plaquette_edges.add(tuple(sorted((u, v))))
             original_faces.append(plaquette_edges)
 
-        original_dual_graph, original_intersection_edges = generate_dual_graph(original_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
+        # original_dual_graph, original_intersection_edges = generate_dual_graph(original_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
         
-        periodic_dual_graph, periodic_intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
-        print("periodic_dual_graph.number_of_nodes()", periodic_dual_graph.number_of_nodes())
-        print("original_intersection_edges", original_intersection_edges)
-        print("periodic_intersection_edges", periodic_intersection_edges)
-        HCB_dual, _, logical_operators_dual = hyperbolic_cycle_basis(original_dual_graph, periodic_dual_graph, q, p)
+        # periodic_dual_graph, periodic_intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
+        # print("periodic_dual_graph.number_of_nodes()", periodic_dual_graph.number_of_nodes())
+        # print("original_intersection_edges", original_intersection_edges)
+        # print("periodic_intersection_edges", periodic_intersection_edges)
+        # HCB_dual, _, logical_operators_dual = hyperbolic_cycle_basis(original_dual_graph, periodic_dual_graph, q, p)
         # print("logical_operators_dual", logical_operators_dual)
         # exit()
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         
-        error_percentage = error_graph(periodic_dual_graph, periodic_intersection_edges, error_probabilities, logical_operators_dual)
-        # error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
+        # error_percentage = error_graph(periodic_dual_graph, periodic_intersection_edges, error_probabilities, logical_operators_dual)
+        error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
         
         plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
                  color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
