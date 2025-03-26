@@ -1044,6 +1044,32 @@ def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_
         error_percentages.append(count / trials)
     return error_percentages
 
+def find_code_distance(logical_operators, periodic_graph):
+    distance = 100
+    for logical_operator in logical_operators:
+        Gi = nx.Graph()
+        operator_len = 100
+        operator_vertices = set()
+        for u, v in periodic_graph.edges():
+            operator_vertices.add(u)
+            operator_vertices.add(v)
+            if (u, v) in logical_operator or (v, u) in logical_operator:
+                Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
+            else:
+                Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
+        
+        for v in operator_vertices:
+            start = v
+            end = (start, 1)
+            length = nx.shortest_path_length(Gi, start, end)
+            path = nx.shortest_path(Gi, start, end)
+            if length < operator_len:
+                print("shortest path", path)
+                operator_len = length
+        
+        if operator_len < distance:
+            distance = operator_len
+    return distance
 if __name__ == '__main__':
     p = 8
     q = 3
@@ -1298,6 +1324,7 @@ if __name__ == '__main__':
     error_probabilities = [0.05 * j for j in range(11)]
     for idx, N in enumerate(CT_matrices_dic):
         G_vertices, redundant_vertices = generate_vertices(p, q, p_B, q_B, N)
+        
         print("redundant_vertices", redundant_vertices)
         
         G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, redundant_vertices, draw=False)
@@ -1309,15 +1336,15 @@ if __name__ == '__main__':
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
         # print("og all_faces", all_faces)
         
-        all_cycles = nx.minimum_cycle_basis(G)
-        plaquettes = [cycle for cycle in all_cycles if len(cycle) == p]
-        original_faces = []
-        for face in plaquettes:
-            plaquette_edges = OrderedSet()
-            for i in range(len(face)):
-                u, v = face[i], face[(i + 1) %p]
-                plaquette_edges.add(tuple(sorted((u, v))))
-            original_faces.append(plaquette_edges)
+        # all_cycles = nx.minimum_cycle_basis(G)
+        # plaquettes = [cycle for cycle in all_cycles if len(cycle) == p]
+        # original_faces = []
+        # for face in plaquettes:
+        #     plaquette_edges = OrderedSet()
+        #     for i in range(len(face)):
+        #         u, v = face[i], face[(i + 1) %p]
+        #         plaquette_edges.add(tuple(sorted((u, v))))
+        #     original_faces.append(plaquette_edges)
 
         # original_dual_graph, original_intersection_edges = generate_dual_graph(original_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
         
@@ -1330,12 +1357,13 @@ if __name__ == '__main__':
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
+        d = find_code_distance(logical_operators, periodic_G)
         
         # error_percentage = error_graph(periodic_dual_graph, periodic_intersection_edges, error_probabilities, logical_operators_dual)
         error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
         
         plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
-                 color=colors[idx % len(colors)], label=f'[[n={n},k={k}]]')
+                 color=colors[idx % len(colors)], label=f'[[n={n},k={k},d={d}]]')
 
 
     # Add labels and a title
@@ -1344,7 +1372,7 @@ if __name__ == '__main__':
     plt.title('Error Threshold Graph')
     plt.legend()
     plt.grid(True)
-    plt.show()  # Show all curves in one figure
     end = time.time()
     print(end - start)
+    plt.show()  # Show all curves in one figure
 
