@@ -548,9 +548,11 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
    # Step 2: Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
     while len(all_faces) < num_plaquettes:
         cycle_edges = p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p)
-        all_faces.append(cycle_edges)
-        if len(cycle_basis) < num_plaquettes-1:
-            cycle_basis.append(cycle_edges)
+        if cycle_edges:
+            all_faces.append(cycle_edges)
+            print(f"found a p_cycle, the number of faces is {len(all_faces)}")
+            if len(cycle_basis) < num_plaquettes-1:
+                cycle_basis.append(cycle_edges)
     print("len of cycle_basis after p_cycles", len(cycle_basis))
     
     # Step 3: Find all non_trivial cycles (which form the logical operators)
@@ -574,6 +576,8 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
             if base_point_error:
                 break
             found_logical_operators.append(cycle_edges)
+        if len(set_orth_copy) == 0:
+            break
     set_orth = set_orth_copy
     logical_operators.extend(found_logical_operators)
     cycle_basis.extend(found_logical_operators)
@@ -623,7 +627,6 @@ def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_pl
                         valid_plaquette = all(len(plaquette.intersection(cycle))<= 1 for cycle in cycle_basis)
                         if valid_plaquette:
                             chosen_plaquette = plaquette
-                            all_nodes.remove(node)
                             found = True
                             break
                     # else:
@@ -725,7 +728,6 @@ def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
             for potential_path in potential_cycles:
                 if potential_path not in all_faces:
                     non_trivial_cycle = potential_path
-                    #base_point = node
                     set_orth.remove(base)
                     set_orth = [
                             ({e for e in orth if e not in base } | {e for e in base if e not in orth})
@@ -754,7 +756,6 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
 
     found = False
     error = False
-    non_trivial_cycle = None
     for base in set_orth:
         # Add 2 copies of each edge in G to Gi.
         # If edge is in orth, add cross edge; otherwise in-plane edge
@@ -768,6 +769,7 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
         end = (start, 1)
         length = nx.shortest_path_length(Gi, start, end)
         potential_cycles = find_unique_paths_dfs(Gi, start, end, length)
+        non_trivial_cycle = None
         for potential_path in potential_cycles:
             # Should we also put the condition if potential_path not in cycle_basis to avoid double counting?
             if potential_path not in all_faces:
@@ -1110,33 +1112,33 @@ if __name__ == '__main__':
         
     elif p_B == 10:
         CT_matrices_dic = {
-            1: [[1] for _ in range(p_B)],
+            # 1: [[1] for _ in range(p_B)],
 
             # This coset table produces the correct number of plaquettes
             # #NSG[4599]
-            # 11: [ [ 2, 4, 1, 9, 3, 10, 8, 5, 6, 11, 7 ], 
-            #      [ 3, 1, 5, 2, 8, 9, 11, 7, 4, 6, 10 ], 
-            #      [ 4, 9, 2, 6, 1, 11, 5, 3, 10, 7, 8 ], 
-            #      [ 5, 3, 8, 1, 7, 4, 10, 11, 2, 9, 6 ], 
-            #      [ 6, 10, 9, 11, 4, 8, 1, 2, 7, 5, 3 ], 
-            #      [ 7, 8, 11, 5, 10, 1, 9, 6, 3, 2, 4 ], 
-            #      [ 8, 5, 7, 3, 11, 2, 6, 10, 1, 4, 9 ], 
-            #      [ 9, 6, 4, 10, 2, 7, 3, 1, 11, 8, 5 ],
-            #      [ 10, 11, 6, 7, 9, 5, 2, 4, 8, 3, 1 ], 
-            #      [ 11, 7, 10, 8, 6, 3, 4, 9, 5, 1, 2 ] ],
+            11: [ [ 2, 4, 1, 9, 3, 10, 8, 5, 6, 11, 7 ], 
+                 [ 3, 1, 5, 2, 8, 9, 11, 7, 4, 6, 10 ], 
+                 [ 4, 9, 2, 6, 1, 11, 5, 3, 10, 7, 8 ], 
+                 [ 5, 3, 8, 1, 7, 4, 10, 11, 2, 9, 6 ], 
+                 [ 6, 10, 9, 11, 4, 8, 1, 2, 7, 5, 3 ], 
+                 [ 7, 8, 11, 5, 10, 1, 9, 6, 3, 2, 4 ], 
+                 [ 8, 5, 7, 3, 11, 2, 6, 10, 1, 4, 9 ], 
+                 [ 9, 6, 4, 10, 2, 7, 3, 1, 11, 8, 5 ],
+                 [ 10, 11, 6, 7, 9, 5, 2, 4, 8, 3, 1 ], 
+                 [ 11, 7, 10, 8, 6, 3, 4, 9, 5, 1, 2 ] ],
 
 
             #NSG[4594]
-            11: [ [   2,   4,   1,   8,   3,  10,   9,   6,   5,  11,   7 ],
-                  [   3,   1,   5,   2,   9,   8,  11,   4,   7,   6,  10 ],
-                  [   4,   8,   2,   6,   1,  11,   5,  10,   3,   7,   9 ],
-                  [   5,   3,   9,   1,   7,   4,  10,   2,  11,   8,   6 ],
-                  [   6,  10,   8,  11,   4,   9,   1,   7,   2,   5,   3 ],
-                  [   7,   9,  11,   5,  10,   1,   8,   3,   6,   2,   4 ],
-                  [   8,   6,   4,  10,   2,   7,   3,  11,   1,   9,   5 ],
-                  [   9,   5,   7,   3,  11,   2,   6,   1,  10,   4,   8 ],
-                  [  10,  11,   6,   7,   8,   5,   2,   9,   4,   3,   1 ],
-                  [  11,   7,  10,   9,   6,   3,   4,   5,   8,   1,   2 ] ],
+            # 11: [ [   2,   4,   1,   8,   3,  10,   9,   6,   5,  11,   7 ],
+            #       [   3,   1,   5,   2,   9,   8,  11,   4,   7,   6,  10 ],
+            #       [   4,   8,   2,   6,   1,  11,   5,  10,   3,   7,   9 ],
+            #       [   5,   3,   9,   1,   7,   4,  10,   2,  11,   8,   6 ],
+            #       [   6,  10,   8,  11,   4,   9,   1,   7,   2,   5,   3 ],
+            #       [   7,   9,  11,   5,  10,   1,   8,   3,   6,   2,   4 ],
+            #       [   8,   6,   4,  10,   2,   7,   3,  11,   1,   9,   5 ],
+            #       [   9,   5,   7,   3,  11,   2,   6,   1,  10,   4,   8 ],
+            #       [  10,  11,   6,   7,   8,   5,   2,   9,   4,   3,   1 ],
+            #       [  11,   7,  10,   9,   6,   3,   4,   5,   8,   1,   2 ] ],
 
 
             # #NSG[4599]
@@ -1212,28 +1214,29 @@ if __name__ == '__main__':
             
         
         # # NSG3[72],NSG5[742] (Abelian) 
-        # 15: [ [ 2, 5, 1, 3, 12, 10, 8, 9, 6, 13, 7, 15, 14, 4, 11 ], 
-        #       [ 3, 1, 4, 14, 2, 9, 11, 7, 8, 6, 15, 5, 10, 13, 12 ], 
-        #       [ 4, 3, 14, 13, 1, 8, 15, 11, 7, 9, 12, 2, 6, 10, 5 ], 
-        #       [ 5, 12, 2, 1, 15, 13, 9, 6, 10, 14, 8, 11, 4, 3, 7 ], 
-        #       [ 6, 10, 9, 8, 13, 12, 1, 2, 5, 15, 3, 14, 11, 7, 4 ], 
-        #       [ 7, 8, 11, 15, 9, 1, 14, 4, 3, 2, 13, 6, 5, 12, 10 ], 
-        #       [ 8, 9, 7, 11, 6, 2, 4, 3, 1, 5, 14, 10, 12, 15, 13 ], 
-        #       [ 9, 6, 8, 7, 10, 5, 3, 1, 2, 12, 4, 13, 15, 11, 14 ], 
-        #       [ 10, 13, 6, 9, 14, 15, 2, 5, 12, 11, 1, 4, 7, 8, 3 ], 
-        #       [ 11, 7, 15, 12, 8, 3, 13, 14, 4, 1, 10, 9, 2, 5, 6 ] ]
+        15: [ [ 2, 5, 1, 3, 12, 10, 8, 9, 6, 13, 7, 15, 14, 4, 11 ], 
+              [ 3, 1, 4, 14, 2, 9, 11, 7, 8, 6, 15, 5, 10, 13, 12 ], 
+              [ 4, 3, 14, 13, 1, 8, 15, 11, 7, 9, 12, 2, 6, 10, 5 ], 
+              [ 5, 12, 2, 1, 15, 13, 9, 6, 10, 14, 8, 11, 4, 3, 7 ], 
+              [ 6, 10, 9, 8, 13, 12, 1, 2, 5, 15, 3, 14, 11, 7, 4 ], 
+              [ 7, 8, 11, 15, 9, 1, 14, 4, 3, 2, 13, 6, 5, 12, 10 ], 
+              [ 8, 9, 7, 11, 6, 2, 4, 3, 1, 5, 14, 10, 12, 15, 13 ], 
+              [ 9, 6, 8, 7, 10, 5, 3, 1, 2, 12, 4, 13, 15, 11, 14 ], 
+              [ 10, 13, 6, 9, 14, 15, 2, 5, 12, 11, 1, 4, 7, 8, 3 ], 
+              [ 11, 7, 15, 12, 8, 3, 13, 14, 4, 1, 10, 9, 2, 5, 6 ] ]
         
         # NSG3[115],NSG5[264] (Abelian)
-        15: [ [ 2, 10, 1, 8, 12, 9, 6, 7, 5, 13, 3, 15, 14, 4, 11 ], 
-              [ 3, 1, 11, 14, 9, 7, 8, 4, 6, 2, 15, 5, 10, 13, 12 ], 
-              [ 4, 8, 14, 5, 1, 11, 15, 12, 3, 7, 13, 2, 6, 9, 10 ], 
-              [ 5, 12, 9, 1, 4, 13, 10, 2, 14, 15, 6, 8, 11, 3, 7 ], 
-              [ 6, 9, 7, 11, 13, 2, 1, 3, 10, 5, 8, 14, 12, 15, 4 ], 
-              [ 7, 6, 8, 15, 10, 1, 3, 11, 2, 9, 4, 13, 5, 12, 14 ], 
-              [ 8, 7, 4, 12, 2, 3, 11, 15, 1, 6, 14, 10, 9, 5, 13 ], 
-              [ 9, 5, 6, 3, 14, 10, 2, 1, 13, 12, 7, 4, 15, 11, 8 ], 
-              [ 10, 13, 2, 7, 15, 5, 9, 6, 12, 14, 1, 11, 4, 8, 3 ], 
-              [ 11, 3, 15, 13, 6, 8, 4, 14, 7, 1, 12, 9, 2, 10, 5 ] ]}
+        # 15: [ [ 2, 10, 1, 8, 12, 9, 6, 7, 5, 13, 3, 15, 14, 4, 11 ], 
+        #       [ 3, 1, 11, 14, 9, 7, 8, 4, 6, 2, 15, 5, 10, 13, 12 ], 
+        #       [ 4, 8, 14, 5, 1, 11, 15, 12, 3, 7, 13, 2, 6, 9, 10 ], 
+        #       [ 5, 12, 9, 1, 4, 13, 10, 2, 14, 15, 6, 8, 11, 3, 7 ], 
+        #       [ 6, 9, 7, 11, 13, 2, 1, 3, 10, 5, 8, 14, 12, 15, 4 ], 
+        #       [ 7, 6, 8, 15, 10, 1, 3, 11, 2, 9, 4, 13, 5, 12, 14 ], 
+        #       [ 8, 7, 4, 12, 2, 3, 11, 15, 1, 6, 14, 10, 9, 5, 13 ], 
+        #       [ 9, 5, 6, 3, 14, 10, 2, 1, 13, 12, 7, 4, 15, 11, 8 ], 
+        #       [ 10, 13, 2, 7, 15, 5, 9, 6, 12, 14, 1, 11, 4, 8, 3 ], 
+        #       [ 11, 3, 15, 13, 6, 8, 4, 14, 7, 1, 12, 9, 2, 10, 5 ] ]
+        }
         
     elif p_B == 14:
         CT_matrices_dic = {
@@ -1324,7 +1327,6 @@ if __name__ == '__main__':
         # print("periodic_intersection_edges", periodic_intersection_edges)
         # HCB_dual, _, logical_operators_dual = hyperbolic_cycle_basis(original_dual_graph, periodic_dual_graph, q, p)
         # print("logical_operators_dual", logical_operators_dual)
-        # exit()
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
