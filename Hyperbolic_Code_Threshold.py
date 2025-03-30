@@ -109,20 +109,6 @@ def generate_vertices(p: int,q: int, p_B: int, q_B: int, N: int):
         if N == 16:
             extra_generators_indices = [(5,2),(2,0),(3,0),(4,0),(5,0),(6,0), (7,0)]
             
-    elif p_B == 10:
-        if N == 15: 
-            extra_generators_indices = [(0,3), (0,8),(9,6),(2,5)]
-        elif N == 21:
-            extra_generators_indices = [(0,3), (9,1),(1,9), (8,0), (6,9), (9,6), (3,4),(4,3), (7,4), (6,5)]
-            
-        elif N == 31:
-            extra_generators_indices =  [(4,3), (4,7), (7,4), (5,2), (2,5), (5,6), (6,5), (8,7), (7,8), (1,2), (2,1),(0,3), (9,1), (3,0),(1,9), (0,8), (8,0), (6,9), (9,6), (3,4)]
-
-    elif p_B == 14:
-        if N == 20:
-            extra_generators_indices = []
-        elif N == 25:
-            extra_generators_indices= [(6,10),(6,4),(8,4),(10,4),(12,4),(5,5),(7,5),(9,5),(11,5),(9,7)]
 
     for index_pair in extra_generators_indices:
         # For each pair of indices, we generate an element of the Fuchsian group by matrix multiplication.
@@ -253,7 +239,6 @@ def get_edge_from_v1_v2(v1: int, v2: int, vertices_to_edges: dict):
     return vertices_to_edges[tup]
 
 def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list, N: int, CT: list, p_B: int, p: int, q: int):
-    print(f"The redundant vertices are {redundant_indices}")
     # Get a list of positions of vertices in the unit cell.
     unit_cell = unit_cell_positions(p, q)
     n = len(unit_cell) 
@@ -274,28 +259,17 @@ def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list,
     T_matrices = [np.zeros((n, n)) for _ in range(p_B)]
 
     # Indices to be updated
-    if p == 8 and q == 3:
-        T_indices = [
-            [[9, 12], [8, 13]],
-            [[12, 9], [13, 8]],
-            [[9, 14], [10, 13]],
-            [[14, 9], [13, 10]],
-            [[10, 15], [11, 14]],
-            [[15, 10], [14, 11]],
-            [[11, 8], [12, 15]],
-            [[8, 11], [15, 12]]]
+
+    T_indices = [
+        [[9, 12], [8, 13]],
+        [[12, 9], [13, 8]],
+        [[9, 14], [10, 13]],
+        [[14, 9], [13, 10]],
+        [[10, 15], [11, 14]],
+        [[15, 10], [14, 11]],
+        [[11, 8], [12, 15]],
+        [[8, 11], [15, 12]]]
         
-    elif (p == 8 and q == 4) or (p == 12 and q ==4):
-        T_indices = []
-        for i in range(int(p_B/2)):
-            T_indices.append([[i,i+int(p_B/2)], [i+int(p_B/2), i]])
-            T_indices.append([[i,i+int(p_B/2)], [i+int(p_B/2), i]])
-        
-    elif (p == 10 and q==3) or (p == 14 and q==3):               
-        T_indices = []
-        for i in range(int(p_B/2)):
-            T_indices.append([(i, i + int(p_B/2))])
-            T_indices.append([(i + int(p_B/2), i)])    
 
     # Update the T matrices
     for j in range(p_B):
@@ -396,26 +370,6 @@ def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edg
     """
 
     periodic_G = copy.deepcopy(original_graph)
-    
-    # for row in range(adjacency_matrix.shape[0]):
-    #     for column in range(adjacency_matrix.shape[1]):
-    #         if adjacency_matrix[row, column] == 1:
-    #             print(f"{(row,column)} 1.0")
-    # 
-    # # Track missing edges in the file
-    # missing_edges = []
-    # 
-    # # Step 1: Check if every edge in G exists in the sparse matrix file
-    # for i in range(adjacency_matrix.shape[0]):
-    #     for j in range(adjacency_matrix.shape[1]):
-    #         if adjacency_matrix[i, j] != 0:  # Edge exists in G
-    #             if (i, j) not in sparse_matrix or (j, i) not in sparse_matrix:
-    #                 missing_edges.append((i, j))
-    # 
-    # # If any edge in G is missing from the file, raise a value error and stop execution
-    # if missing_edges:
-    #     m = len(missing_edges)
-    #     raise ValueError(f"These {m} edges are missing from adjacency matrix {missing_edges}")
 
     # Step 2: Add edges from the sparse matrix file to G if they are not present in G
     edges_added = []
@@ -430,14 +384,6 @@ def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edg
                 edge_count += 1
             else:
                 raise ValueError(f"Could not add edge; nodes ({i}, {j}) not in graph")
-
-    # # # Print added edges
-    # if edges_added:
-    #     print(f"Added {len(edges_added)} edges to the graph:")
-    #     for edge in edges_added:
-    #         print(f"Added edge: {edge}")
-    # else:
-    #     print("No additional edges were added to the graph.")
 
     if draw:
         plt.figure(figsize=(20, 20))
@@ -511,24 +457,18 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     # Recall that every cycle C (and every witness S) is given as a vector in the chords, that is every cycle (and every witness S) is given as a vector v \in {0,1}^N
     set_orth = [{tuple(sorted(edge))} for edge in chords]
     print(f"The initial length of the set_orth is {len(set_orth)}")
-   # print(f"The initial set_orth is {set_orth}")
-    # print("initial set_orth", set_orth)
     nx_cycle_basis = nx.minimum_cycle_basis(original_graph)
-    print("nx_cycle_basis", nx_cycle_basis)
-    print(f"nx min cycle basis len {len(nx_cycle_basis)}")
     original_cycles_length = len(nx_cycle_basis)
     
     # Step 1: Extracting plaquettes from the original graph.
     while len(cycle_basis) < original_cycles_length:
         for i, base in enumerate(set_orth):
-            # print(f"{i}, current base {base}, current cycle {nx_cycle_basis[0]}, current set_orth {set_orth}")
             valid_cycles, cycle_edges = valid_cycle_basis(nx_cycle_basis[0], base, p)
             if valid_cycles:
                 cycle_basis.append(cycle_edges)
                 all_faces.append(cycle_edges) 
                 nx_cycle_basis.remove(nx_cycle_basis[0])
                 set_orth.remove(base)
-                # print(f"removed {base} from {set_orth} \n")
                 # Update the set of vectors orthogonal to sofar found cycles
                 set_orth = [
                     ({e for e in orth if e not in base } | {e for e in base if e not in orth})
@@ -550,7 +490,6 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
         cycle_edges = p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p)
         if cycle_edges:
             all_faces.append(cycle_edges)
-            print(f"found a p_cycle, the number of faces is {len(all_faces)}")
             if len(cycle_basis) < num_plaquettes-1:
                 cycle_basis.append(cycle_edges)
     print("len of cycle_basis after p_cycles", len(cycle_basis))
@@ -585,18 +524,12 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
         
     print("length of logical_op after non_trivia_cycles", len(logical_operators))
 
-    print(f"len set_orth {len(set_orth)}")
 
     if set_orth:
         raise ValueError("The number of cycles in the cycle basis is not E-V+1")
     print(f"The number of cycles in total is {len(cycle_basis)}")
     print(f"The remaining number of cycles in the basis is {len(set_orth)}")
     non_trivial_cycles_ = [cycle for cycle in cycle_basis if cycle not in all_faces]
-    # for idx, cycle in enumerate(non_trivial_cycles_):
-    #     print(f"The non_trivial cycle {idx} is {cycle}")
-    
-    # print("All logical operators are ", logical_operators)
-    
     return cycle_basis, all_faces, logical_operators      
             
 def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_plaquettes: int, all_nodes: list, p: int):    
@@ -629,8 +562,7 @@ def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_pl
                             chosen_plaquette = plaquette
                             found = True
                             break
-                    # else:
-                    #     print(f"The plaquette {plaquette} is duplicated")
+
             if found and len(cycle_basis) < num_plaquettes-1:
                 set_orth.remove(base)
                 set_orth = [
@@ -644,13 +576,6 @@ def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_pl
         if found:
             break
     
-  
-        #     
-        # if chosen_plaquette is None:
-        #     # for i, cycle in enumerate(cycle_basis):
-        #     #     print(f"The {i} cycle is {cycle}")
-        #     raise ValueError("No valid plaquette of length p was found in the graph.")
-        # 
     return chosen_plaquette   
     
 def valid_cycle_basis(cycle: list, S: dict, p: int):
@@ -786,28 +711,21 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
                 break
         if found:
             break
-                    
-    # print(base_point)
     if not found:
-        print(f"The number of remaining chords is {len(set_orth)}")
         error = True
-        # raise ValueError(f"Could not find extra cycles with basepoint {base_point}")
     
     return non_trivial_cycle, error
 
 def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict):
     """Convert logical operators from a list of pairs of vertices (v1,v2) to edge labels."""
     logical_operators_edges = []
-    # print("looping over logical_operators", logical_operators)
+
     for logical_operator in logical_operators:
-        # print("The logical operator is", logical_operator)
         lg_edges = set()
         for pair in logical_operator:
-            # print("pair is", pair)
             lg_edges.add(
             get_edge_from_v1_v2(pair[0], pair[1], vertices_to_edges))
         logical_operators_edges.append(lg_edges)
-        # print("Logical operator edges is", lg_edges)
     return logical_operators_edges
 
 def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_dict: dict, draw=False):
@@ -844,39 +762,23 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
             if len(intersection) == 1:
                 label = get_edge_from_v1_v2(intersection[0][0],intersection[0][1], vertices_to_edges)
                 G_dual_graph.add_edge(i, j, label=label)
-                # vertices_to_edges[(i, j)] = edge_count
-                # print(f"The first cycle is {cycle1}")
-                # print(f"The second cycle is {cycle2}")
-                # print(f"The inersection between the two cycles is {intersection}")
                 intersection_edges[(i,j)] = label
             elif len(intersection) == 0:
                 continue
             else:
-                # print(f"The first cycle is {cycle1}")
-                # print(f"The second cycle is {cycle2}")
-                # print(f"The inersection between the two cycles is {intersection}")
                 raise ValueError(f"The intersection between two faces {i} and {j} is {len(cycle1.intersection(cycle2))}")
 
-    # Verify that each vertex is present exactly p times
-    # count = {}
-    # for i in range(len(all_faces)):
-    #     count[i] = 0
-    # for pair in intersection_edges.keys():
-    #     count[pair[0]] += 1
-    #     count[pair[1]] += 1
-    # if not all(c == p for c in count.values()):
-    #     raise Exception("Some vertices in dual graph do not exist exactly p times")
 
     if draw:
-        plt.figure(figsize=(10, 10))  # Adjust the width and height as needed
-        # Draw the graph
+        plt.figure(figsize=(10, 10)) 
+       
         nx.draw(
             G_dual_graph,
             pos=pos_dict,
-            node_size=20,  # Adjust node size
+            node_size=20, 
             node_color="lightblue",
             with_labels=True,
-            font_size=12,  # Increase font size for node labels
+            font_size=12, 
             font_color="black"
             )
         nx.draw_networkx_edge_labels(
@@ -887,11 +789,6 @@ def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_
             label_pos=0.5,
         )
         plt.show()
-
-        
-    node_degrees = [deg for node, deg in G_dual_graph.degree() if deg != p]
-    # if node_degrees:
-    #     raise ValueError(f"Some nodes in the dual graph do not have {p} neighbours")
         
     return G_dual_graph, intersection_edges
 
@@ -926,11 +823,6 @@ def generate_phase_flip_circuit(periodic_G: nx.Graph, all_faces: list, graph_ver
             affected_edges.append(j)
     qc.barrier()
     
-    # for j in [0,11,83]:
-    #     qc.x(edges_qubits[j])
-    #     affected_edges.append(j)
-    # print('affected_edges', affected_edges)
-    # qc.barrier()
 
     # CX between centre ancilla and neighboring edges
     for i, plaquette in enumerate(all_faces):
@@ -950,8 +842,6 @@ def generate_phase_flip_circuit(periodic_G: nx.Graph, all_faces: list, graph_ver
     # Z measurement
     for v in range(num_plaquettes):
         qc.measure(plaquette_ancilla_qubits[v], cr[v])
-
-    # qc.draw('mpl')
 
     return qc, affected_edges
 
@@ -984,12 +874,9 @@ def find_correction_paths(syndrome_graph: nx.Graph, periodic_graph: nx.Graph):
     matching = nx.algorithms.matching.min_weight_matching(syndrome_graph)
 
     correction_paths = []
-    # Print the matching
-    # print("Minimum Weight Perfect Matching:", matching)
+    
     for edge in matching:
-        # print(edge, "with weight", syndrome_graph.edges[edge]['weight'])
         path = nx.shortest_path(periodic_graph, source=edge[0], target=edge[1])
-        # print('path', path)
         correction_paths.append(path)
     return correction_paths
 
@@ -1002,7 +889,6 @@ def get_logical_error(affected_edges: list, correction_paths: list, vertices_to_
     for correction_path in correction_paths:
         for i in range(len(correction_path) - 1):
             all_correction_edges.add(get_edge_from_v1_v2(correction_path[i], correction_path[i + 1], vertices_to_edges))
-    # print('correction_edg', sorted(all_correction_edges))
 
     if all_correction_edges == affected_edges_set:
         return False
@@ -1032,11 +918,10 @@ def run_trial(args):
     return is_err
 
 def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
-    trials = 2
+    trials = 5000
     error_percentages = []
     for ep in error_probabilities:
         print(f"Processing error probability {ep} for the graph with {periodic_graph.number_of_edges()} qubits")
-        # Prepare the arguments for each trial
         args_list = [(periodic_graph, vertices_to_edges, ep, logical_operators) for _ in range(trials)]
         with Pool(processes=multiprocessing.cpu_count()) as pool:
             results = pool.map(run_trial, args_list)
@@ -1064,7 +949,6 @@ def find_code_distance(logical_operators, periodic_graph):
             length = nx.shortest_path_length(Gi, start, end)
             path = nx.shortest_path(Gi, start, end)
             if length < operator_len:
-                print("shortest path", path)
                 operator_len = length
         
         if operator_len < distance:
@@ -1075,12 +959,9 @@ if __name__ == '__main__':
     q = 3
     p_B = 8
     q_B = 8
-    # N = 9
     
     if p_B == 8:
-        CT_matrices_dic = {
-            # 1: [[1] for _ in range(p_B)],
-                
+        CT_matrices_dic = {                
             # Abelian Subgroup, NSG[365]
             9: [ [ 2, 3, 1, 6, 8, 9, 5, 7, 4 ], 
                  [ 3, 1, 2, 9, 7, 4, 8, 5, 6 ], 
@@ -1101,29 +982,7 @@ if __name__ == '__main__':
                   [ 7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10 ], 
                   [ 8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2 ], 
                   [ 9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3 ] ],
-            
-            # Abelian Subgroup, NSG[2782]
-#             12: [ [   2,  10,   1,   8,  11,   9,  12,   7,   5,   4,   3,   6 ],
-#   [   3,   1,  11,  10,   9,  12,   8,   4,   6,   2,   5,   7 ],
-#   [   4,   8,  10,  12,   1,  11,   9,   6,   3,   7,   2,   5 ],
-#   [   5,  11,   9,   1,  12,   8,  10,   2,   7,   3,   6,   4 ],
-#   [   6,   9,  12,  11,   8,  10,   1,   3,   4,   5,   7,   2 ],
-#   [   7,  12,   8,   9,  10,   1,  11,   5,   2,   6,   4,   3 ],
-#   [   8,   7,   4,   6,   2,   3,   5,   9,   1,  12,  10,  11 ],
-#   [   9,   5,   6,   3,   7,   4,   2,   1,   8,  11,  12,  10 ] ],
 
-            # Coset Table for the Abelian Subgroup at Index 3426: # d=8
-            # 12: [ [   2,  10,   1,   9,  11,  12,   8,   5,   6,   4,   3,   7 ],
-            #   [   3,   1,  11,  10,   8,   9,  12,   7,   4,   2,   5,   6 ],
-            #   [   4,   9,  10,  12,   1,   8,  11,   3,   7,   6,   2,   5 ],
-            #   [   5,  11,   8,   1,  12,  10,   9,   6,   2,   3,   7,   4 ],
-            #   [   6,  12,   9,   8,  10,  11,   1,   2,   5,   7,   4,   3 ],
-            #   [   7,   8,  12,  11,   9,   1,  10,   4,   3,   5,   6,   2 ],
-            #   [   8,   5,   7,   3,   6,   2,   4,   9,   1,  11,  12,  10 ],
-            #   [   9,   6,   4,   7,   2,   5,   3,   1,   8,  12,  10,  11 ] ],
-         
-            
-            
                     
 #             # Abelian Subgroup, NSG[10425]
             16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
@@ -1136,196 +995,13 @@ if __name__ == '__main__':
                   [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
             }
         
-    elif p_B == 10:
-        CT_matrices_dic = {
-            # 1: [[1] for _ in range(p_B)],
-
-            # This coset table produces the correct number of plaquettes
-            # #NSG[4599]
-            11: [ [ 2, 4, 1, 9, 3, 10, 8, 5, 6, 11, 7 ], 
-                 [ 3, 1, 5, 2, 8, 9, 11, 7, 4, 6, 10 ], 
-                 [ 4, 9, 2, 6, 1, 11, 5, 3, 10, 7, 8 ], 
-                 [ 5, 3, 8, 1, 7, 4, 10, 11, 2, 9, 6 ], 
-                 [ 6, 10, 9, 11, 4, 8, 1, 2, 7, 5, 3 ], 
-                 [ 7, 8, 11, 5, 10, 1, 9, 6, 3, 2, 4 ], 
-                 [ 8, 5, 7, 3, 11, 2, 6, 10, 1, 4, 9 ], 
-                 [ 9, 6, 4, 10, 2, 7, 3, 1, 11, 8, 5 ],
-                 [ 10, 11, 6, 7, 9, 5, 2, 4, 8, 3, 1 ], 
-                 [ 11, 7, 10, 8, 6, 3, 4, 9, 5, 1, 2 ] ],
-
-
-            #NSG[4594]
-            # 11: [ [   2,   4,   1,   8,   3,  10,   9,   6,   5,  11,   7 ],
-            #       [   3,   1,   5,   2,   9,   8,  11,   4,   7,   6,  10 ],
-            #       [   4,   8,   2,   6,   1,  11,   5,  10,   3,   7,   9 ],
-            #       [   5,   3,   9,   1,   7,   4,  10,   2,  11,   8,   6 ],
-            #       [   6,  10,   8,  11,   4,   9,   1,   7,   2,   5,   3 ],
-            #       [   7,   9,  11,   5,  10,   1,   8,   3,   6,   2,   4 ],
-            #       [   8,   6,   4,  10,   2,   7,   3,  11,   1,   9,   5 ],
-            #       [   9,   5,   7,   3,  11,   2,   6,   1,  10,   4,   8 ],
-            #       [  10,  11,   6,   7,   8,   5,   2,   9,   4,   3,   1 ],
-            #       [  11,   7,  10,   9,   6,   3,   4,   5,   8,   1,   2 ] ],
-
-
-            # #NSG[4599]
-            # 11: [ [   2,   4,   1,   8,   3,  11,   9,   6,   5,   7,  10 ],
-            #   [   3,   1,   5,   2,   9,   8,  10,   4,   7,  11,   6 ],
-            #   [   4,   8,   2,   6,   1,  10,   5,  11,   3,   9,   7 ],
-            #   [   5,   3,   9,   1,   7,   4,  11,   2,  10,   6,   8 ],
-            #   [   6,  11,   8,  10,   4,   9,   1,   7,   2,   3,   5 ],
-            #   [   7,   9,  10,   5,  11,   1,   8,   3,   6,   4,   2 ],
-            #   [   8,   6,   4,  11,   2,   7,   3,  10,   1,   5,   9 ],
-            #   [   9,   5,   7,   3,  10,   2,   6,   1,  11,   8,   4 ],
-            #   [  10,   7,  11,   9,   6,   3,   4,   5,   8,   2,   1 ],
-            #   [  11,  10,   6,   7,   8,   5,   2,   9,   4,   1,   3 ] ],
-            
-            
-            # This coset table produces the correct number of plaquettes
-            # NSG[15959]
-            # 11: [ [   2,  11,   1,   8,   4,   9,  10,   7,   5,   3,   6 ],
-            #       [   3,   1,  10,   5,   9,  11,   8,   4,   6,   7,   2 ],
-            #       [   4,   8,   5,   2,   1,  10,   6,  11,   3,   9,   7 ],
-            #       [   5,   4,   9,   1,   3,   7,  11,   2,  10,   6,   8 ],
-            #       [   6,   9,  11,  10,   7,   4,   1,   3,   8,   2,   5 ],
-            #       [   7,  10,   8,   6,  11,   1,   5,   9,   2,   4,   3 ],
-            #       [   8,   7,   4,  11,   2,   3,   9,   6,   1,   5,  10 ],
-            #       [   9,   5,   6,   3,  10,   8,   2,   1,   7,  11,   4 ],
-            #       [  10,   3,   7,   9,   6,   2,   4,   5,  11,   8,   1 ],
-            #       [  11,   6,   2,   7,   8,   5,   3,  10,   4,   1,   9 ] ],
-            
-            
-        
-            
-            # # NSG[73395]
-            # 14: [ [   2,   7,   1,   6,  11,   3,   5,  10,  12,   4,   9,  14,   8,  13 ],
-            #       [   3,   1,   6,  10,   7,   4,   2,  13,  11,   8,   5,   9,  14,  12 ],
-            #       [   4,   6,  10,  13,   1,   8,   3,  12,   7,  14,   2,   5,   9,  11 ],
-            #       [   5,  11,   7,   1,  12,   2,   9,   6,  13,   3,  14,   8,   4,  10 ],
-            #       [   6,   3,   4,   8,   2,  10,   1,  14,   5,  13,   7,  11,  12,   9 ],
-            #       [   7,   5,   2,   3,   9,   1,  11,   4,  14,   6,  12,  13,  10,   8 ],
-            #       [   8,  10,  13,  12,   6,  14,   4,  11,   1,   9,   3,   2,   5,   7 ],
-            #       [   9,  12,  11,   7,  13,   5,  14,   1,  10,   2,   8,   4,   3,   6 ],
-            #       [  10,   4,   8,  14,   3,  13,   6,   9,   2,  12,   1,   7,  11,   5 ],
-            #       [  11,   9,   5,   2,  14,   7,  12,   3,   8,   1,  13,  10,   6,   4 ] ]
-            
-            
-            
-            
-            # #NSG[53043]
-            # 14: [ [   2,   7,   1,   9,  11,   3,  10,   5,  12,   4,   6,  14,   8,  13 ],
-            #       [   3,   1,   6,  10,   8,  11,   2,  13,   4,   7,   5,   9,  14,  12 ],
-            #       [   4,   9,  10,  13,   1,   7,  12,   3,   8,  14,   2,   5,   6,  11 ],
-            #       [   5,  11,   8,   1,  12,  13,   6,   9,   2,   3,  14,   7,   4,  10 ],
-            #       [   6,   3,  11,   7,  13,   5,   1,  14,  10,   2,   8,   4,  12,   9 ],
-            #       [   7,  10,   2,  12,   6,   1,   4,  11,  14,   9,   3,  13,   5,   8 ],
-            #       [   8,   5,  13,   3,   9,  14,  11,   4,   1,   6,  12,   2,  10,   7 ],
-            #       [   9,  12,   4,   8,   2,  10,  14,   1,   5,  13,   7,  11,   3,   6 ],
-            #       [  10,   4,   7,  14,   3,   2,   9,   6,  13,  12,   1,   8,  11,   5 ],
-            #       [  11,   6,   5,   2,  14,   8,   3,  12,   7,   1,  13,  10,   9,   4 ] ]
-                
-                
-                
-                
-         # # NSG[28827]       
-         #   14: [ [   2,   7,   1,   9,   4,   3,  10,   5,  12,  11,   6,  14,   8,  13 ],
-         #      [   3,   1,   6,   5,   8,  11,   2,  13,   4,   7,  10,   9,  14,  12 ],
-         #      [   4,   9,   5,   2,   1,   8,  12,   3,   7,  14,  13,  10,   6,  11 ],
-         #      [   5,   4,   8,   1,   3,  13,   9,   6,   2,  12,  14,   7,  11,  10 ],
-         #      [   6,   3,  11,   8,  13,  10,   1,  14,   5,   2,   7,   4,  12,   9 ],
-         #      [   7,  10,   2,  12,   9,   1,  11,   4,  14,   6,   3,  13,   5,   8 ],
-         #      [   8,   5,  13,   3,   6,  14,   4,  11,   1,   9,  12,   2,  10,   7 ],
-         #      [   9,  12,   4,   7,   2,   5,  14,   1,  10,  13,   8,  11,   3,   6 ],
-         #      [  10,  11,   7,  14,  12,   2,   6,   9,  13,   3,   1,   8,   4,   5 ],
-         #      [  11,   6,  10,  13,  14,   7,   3,  12,   8,   1,   2,   5,   9,   4 ] ]
-            
-        
-        # # NSG3[72],NSG5[742] (Abelian) 
-        15: [ [ 2, 5, 1, 3, 12, 10, 8, 9, 6, 13, 7, 15, 14, 4, 11 ], 
-              [ 3, 1, 4, 14, 2, 9, 11, 7, 8, 6, 15, 5, 10, 13, 12 ], 
-              [ 4, 3, 14, 13, 1, 8, 15, 11, 7, 9, 12, 2, 6, 10, 5 ], 
-              [ 5, 12, 2, 1, 15, 13, 9, 6, 10, 14, 8, 11, 4, 3, 7 ], 
-              [ 6, 10, 9, 8, 13, 12, 1, 2, 5, 15, 3, 14, 11, 7, 4 ], 
-              [ 7, 8, 11, 15, 9, 1, 14, 4, 3, 2, 13, 6, 5, 12, 10 ], 
-              [ 8, 9, 7, 11, 6, 2, 4, 3, 1, 5, 14, 10, 12, 15, 13 ], 
-              [ 9, 6, 8, 7, 10, 5, 3, 1, 2, 12, 4, 13, 15, 11, 14 ], 
-              [ 10, 13, 6, 9, 14, 15, 2, 5, 12, 11, 1, 4, 7, 8, 3 ], 
-              [ 11, 7, 15, 12, 8, 3, 13, 14, 4, 1, 10, 9, 2, 5, 6 ] ]
-        
-        # NSG3[115],NSG5[264] (Abelian)
-        # 15: [ [ 2, 10, 1, 8, 12, 9, 6, 7, 5, 13, 3, 15, 14, 4, 11 ], 
-        #       [ 3, 1, 11, 14, 9, 7, 8, 4, 6, 2, 15, 5, 10, 13, 12 ], 
-        #       [ 4, 8, 14, 5, 1, 11, 15, 12, 3, 7, 13, 2, 6, 9, 10 ], 
-        #       [ 5, 12, 9, 1, 4, 13, 10, 2, 14, 15, 6, 8, 11, 3, 7 ], 
-        #       [ 6, 9, 7, 11, 13, 2, 1, 3, 10, 5, 8, 14, 12, 15, 4 ], 
-        #       [ 7, 6, 8, 15, 10, 1, 3, 11, 2, 9, 4, 13, 5, 12, 14 ], 
-        #       [ 8, 7, 4, 12, 2, 3, 11, 15, 1, 6, 14, 10, 9, 5, 13 ], 
-        #       [ 9, 5, 6, 3, 14, 10, 2, 1, 13, 12, 7, 4, 15, 11, 8 ], 
-        #       [ 10, 13, 2, 7, 15, 5, 9, 6, 12, 14, 1, 11, 4, 8, 3 ], 
-        #       [ 11, 3, 15, 13, 6, 8, 4, 14, 7, 1, 12, 9, 2, 10, 5 ] ]
-        }
-        
-    elif p_B == 14:
-        CT_matrices_dic = {
-        1: [[1] for _ in range(p_B)],
-            
-        15: [ [   2,   4,   1,   5,   3,   8,  10,  14,   7,  13,   6,  11,  15,  12,   9 ],
-              [   3,   1,   5,   2,   4,  11,   9,   6,  15,   7,  12,  14,  10,   8,  13 ],
-              [   4,   5,   2,   3,   1,  14,  13,  12,  10,  15,   8,   6,   9,  11,   7 ],
-              [   5,   3,   4,   1,   2,  12,  15,  11,  13,   9,  14,   8,   7,   6,  10 ],
-              [   6,   8,  11,  14,  12,   7,   1,  10,   3,   2,   9,  15,   4,  13,   5 ],
-              [   7,  10,   9,  13,  15,   1,   6,   2,  11,   8,   3,   5,  14,   4,  12 ],
-              [   8,  14,   6,  12,  11,  10,   2,  13,   1,   4,   7,   9,   5,  15,   3 ],
-              [   9,   7,  15,  10,  13,   3,  11,   1,  12,   6,   5,   4,   8,   2,  14 ],
-              [  10,  13,   7,  15,   9,   2,   8,   4,   6,  14,   1,   3,  12,   5,  11 ],
-              [  11,   6,  12,   8,  14,   9,   3,   7,   5,   1,  15,  13,   2,  10,   4 ],
-              [  12,  11,  14,   6,   8,  15,   5,   9,   4,   3,  13,  10,   1,   7,   2 ],
-              [  13,  15,  10,   9,   7,   4,  14,   5,   8,  12,   2,   1,  11,   3,   6 ],
-              [  14,  12,   8,  11,   6,  13,   4,  15,   2,   5,  10,   7,   3,   9,   1 ],
-              [  15,   9,  13,   7,  10,   5,  12,   3,  14,  11,   4,   2,   6,   1,   8 ] ],
-
-
-    #  #NSG15[109,10319]
-        # 15 :[ [   2,   4,   1,   5,   3,  10,   8,  14,   6,  12,   7,  15,  11,  13,   9 ],
-        #       [   3,   1,   5,   2,   4,   9,  11,   7,  15,   6,  13,  10,  14,   8,  12 ],
-        #       [   4,   5,   2,   3,   1,  12,  14,  13,  10,  15,   8,   9,   7,  11,   6 ],
-        #       [   5,   3,   4,   1,   2,  15,  13,  11,  12,   9,  14,   6,   8,   7,  10 ],
-        #       [   6,  10,   9,  12,  15,   7,   1,   2,  11,   8,   3,  14,   5,   4,  13 ],
-        #       [   7,   8,  11,  14,  13,   1,   6,  10,   3,   2,   9,   4,  15,  12,   5 ],
-        #       [   8,  14,   7,  13,  11,   2,  10,  12,   1,   4,   6,   5,   9,  15,   3 ],
-        #       [   9,   6,  15,  10,  12,  11,   3,   1,  13,   7,   5,   8,   4,   2,  14 ],
-        #       [  10,  12,   6,  15,   9,   8,   2,   4,   7,  14,   1,  13,   3,   5,  11 ],
-        #       [  11,   7,  13,   8,  14,   3,   9,   6,   5,   1,  15,   2,  12,  10,   4 ],
-        #       [  12,  15,  10,   9,   6,  14,   4,   5,   8,  13,   2,  11,   1,   3,   7 ],
-        #       [  13,  11,  14,   7,   8,   5,  15,   9,   4,   3,  12,   1,  10,   6,   2 ],
-        #       [  14,  13,   8,  11,   7,   4,  12,  15,   2,   5,  10,   3,   6,   9,   1 ],
-        #       [  15,   9,  12,   6,  10,  13,   5,   3,  14,  11,   4,   7,   2,   1,   8 ] ],
-
-
-        25: [ [   2,   4,   1,   5,   3,   8,  13,  10,   7,  14,   9,   6,  15,  12,  11,  17,  18,  20,  16,  19,  24,  21,  22,  25,  23 ],
-              [   3,   1,   5,   2,   4,  12,   9,   6,  11,   8,  15,  14,   7,  10,  13,  19,  16,  17,  20,  18,  22,  23,  25,  21,  24 ],
-              [   4,   5,   2,   3,   1,  10,  15,  14,  13,  12,   7,   8,  11,   6,   9,  18,  20,  19,  17,  16,  25,  24,  21,  23,  22 ],
-              [   5,   3,   4,   1,   2,  14,  11,  12,  15,   6,  13,  10,   9,   8,   7,  20,  19,  16,  18,  17,  23,  25,  24,  22,  21 ],
-              [   6,   8,  12,  10,  14,  16,   1,  17,   3,  18,   5,  19,   2,  20,   4,  21,  24,  25,  22,  23,   7,   9,  11,  13,  15 ],
-              [   7,  13,   9,  15,  11,   1,  21,   2,  22,   4,  23,   3,  24,   5,  25,   6,   8,  10,  12,  14,  16,  19,  20,  17,  18 ],
-              [   8,  10,   6,  14,  12,  17,   2,  18,   1,  20,   3,  16,   4,  19,   5,  24,  25,  23,  21,  22,  13,   7,   9,  15,  11 ],
-              [   9,   7,  11,  13,  15,   3,  22,   1,  23,   2,  25,   5,  21,   4,  24,  12,   6,   8,  14,  10,  19,  20,  18,  16,  17 ],
-              [  10,  14,   8,  12,   6,  18,   4,  20,   2,  19,   1,  17,   5,  16,   3,  25,  23,  22,  24,  21,  15,  13,   7,  11,   9 ],
-              [  11,   9,  15,   7,  13,   5,  23,   3,  25,   1,  24,   4,  22,   2,  21,  14,  12,   6,  10,   8,  20,  18,  17,  19,  16 ],
-              [  12,   6,  14,   8,  10,  19,   3,  16,   5,  17,   4,  20,   1,  18,   2,  22,  21,  24,  23,  25,   9,  11,  15,   7,  13 ],
-              [  13,  15,   7,  11,   9,   2,  24,   4,  21,   5,  22,   1,  25,   3,  23,   8,  10,  14,   6,  12,  17,  16,  19,  18,  20 ],
-              [  14,  12,  10,   6,   8,  20,   5,  19,   4,  16,   2,  18,   3,  17,   1,  23,  22,  21,  25,  24,  11,  15,  13,   9,   7 ],
-              [  15,  11,  13,   9,   7,   4,  25,   5,  24,   3,  21,   2,  23,   1,  22,  10,  14,  12,   8,   6,  18,  17,  16,  20,  19 ] ]}
-    else:
-        raise ValueError("Invalid value for p_B")
     
-    plt.figure(figsize=(10, 10))  # Set figure size once before the loop
+    plt.figure(figsize=(10, 10)) 
 
-    colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']  # Define different colors
+    colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']
     error_probabilities = [0.05 * j for j in range(11)]
     for idx, N in enumerate(CT_matrices_dic):
         G_vertices, redundant_vertices = generate_vertices(p, q, p_B, q_B, N)
-        
-        print("redundant_vertices", redundant_vertices)
         
         G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, redundant_vertices, draw=False)
         
@@ -1334,45 +1010,24 @@ if __name__ == '__main__':
         periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict)
         
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
-        # print("og all_faces", all_faces)
-        
-        # all_cycles = nx.minimum_cycle_basis(G)
-        # plaquettes = [cycle for cycle in all_cycles if len(cycle) == p]
-        # original_faces = []
-        # for face in plaquettes:
-        #     plaquette_edges = OrderedSet()
-        #     for i in range(len(face)):
-        #         u, v = face[i], face[(i + 1) %p]
-        #         plaquette_edges.add(tuple(sorted((u, v))))
-        #     original_faces.append(plaquette_edges)
 
-        # original_dual_graph, original_intersection_edges = generate_dual_graph(original_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
-        
-        # periodic_dual_graph, periodic_intersection_edges = generate_dual_graph(all_faces, p, G_vertices_to_edges, G_pos_dict, draw=False)
-        # print("periodic_dual_graph.number_of_nodes()", periodic_dual_graph.number_of_nodes())
-        # print("original_intersection_edges", original_intersection_edges)
-        # print("periodic_intersection_edges", periodic_intersection_edges)
-        # HCB_dual, _, logical_operators_dual = hyperbolic_cycle_basis(original_dual_graph, periodic_dual_graph, q, p)
-        # print("logical_operators_dual", logical_operators_dual)
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         d = find_code_distance(logical_operators, periodic_G)
         
-        # error_percentage = error_graph(periodic_dual_graph, periodic_intersection_edges, error_probabilities, logical_operators_dual)
         error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
         
         plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
-                 color=colors[idx % len(colors)], label=f'[[n={n},k={k},d={d}]]')
+                 color=colors[idx % len(colors)], label=f'[[n={n}, k={k}, d={d}]]')
 
 
-    # Add labels and a title
-    plt.xlabel('Error Probabilities')
-    plt.ylabel('Error Percentages')
+    plt.xlabel('Physical Error Probabilities')
+    plt.ylabel('Logical Error Probabilities')
     plt.title('Error Threshold Graph')
     plt.legend()
     plt.grid(True)
     end = time.time()
     print(end - start)
-    plt.show()  # Show all curves in one figure
+    plt.show() 
 
