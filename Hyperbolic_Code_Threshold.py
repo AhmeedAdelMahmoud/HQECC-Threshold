@@ -27,18 +27,21 @@ from sympy.core.containers import OrderedSet
 
 start = time.time()
 
-# This function calculates the hyperbolic distance between two points in the complex plane.
 def hyperbolic_distance(z1: complex, z2: complex):
+    """Calculate the hyperbolic distance between two points in the complex plane."""
+
     d = np.arccosh(1 + (2 * (abs(z1 - z2)) ** 2 / ((1 - abs(z1) ** 2) * (1 - abs(z2) ** 2))))
     return d
 
-# This function calculates the Euclidean distance between two points in the complex plane.
+
 def euclidean_distance(z1: complex, z2: complex):
     d = abs(z1 - z2)
     return d
 
-# This function takes as input two integers that define a hyperbolic lattice {p,q} and returns a list of positions for the vertices in the unit cell of that lattice.
+
 def unit_cell_positions(p: int, q: int):
+    """Find the positions of the vertices in the unit cell of the hyperbolic lattice {p,q}"""
+
     a = np.pi / p
     b = np.pi / q
     r0 = np.sqrt(np.cos(a + b) / np.cos(a - b))
@@ -54,195 +57,152 @@ def unit_cell_positions(p: int, q: int):
             vertices_positions.append(r0 * np.exp(1j * np.pi * (2 * k) / p))
     return vertices_positions
 
+
 def rotation_matrix(phi: complex):
     return np.array([[np.exp(1j * phi / 2), 0], [0, np.exp(-1j * phi / 2)]])
 
+
 def fuchsian_generators(p_B: int, q_B: int):
-    alpha = 2* np.pi/ p_B
-    beta = 2* np.pi/ q_B
-    sigma = np.sqrt((np.cos(alpha) + np.cos(beta)) / (1 + np.cos(beta)) )
-    gamma1 = 1/(np.sqrt(1-sigma**2)) * np.array([[1, sigma], [sigma,1]])
+    alpha = 2 * np.pi / p_B
+    beta = 2 * np.pi / q_B
+    sigma = np.sqrt((np.cos(alpha) + np.cos(beta)) / (1 + np.cos(beta)))
+    gamma1 = 1 / (np.sqrt(1-sigma**2)) * np.array([[1, sigma], [sigma, 1]])
     FG_generators = []
-    for mu in range(0,int(p_B/2)):
-        gamma_j = rotation_matrix(mu*alpha) @ gamma1 @ rotation_matrix(-mu*alpha)
+    for mu in range(0, int(p_B / 2)):
+        gamma_j = rotation_matrix(mu * alpha) @ gamma1 @ rotation_matrix(-mu * alpha)
         FG_generators.append(gamma_j)
         FG_generators.append(np.linalg.inv(gamma_j))
     return FG_generators
+
 
 def create_new_vertex(vertex_position: complex, translation_matrix: np.array):
     v = translation_matrix @ np.array([vertex_position, 1])
     new_vertex_position = v[0] / v[1]
     return new_vertex_position
 
-def generate_vertices(p: int,q: int, p_B: int, q_B: int, N: int):
-    # Create the unit cell of the {p,q} lattice
+
+def generate_vertices(p: int, q: int, p_B: int, q_B: int, N: int):
+    """For the {p,q} lattice in the Bravais lattice {p_B, q_B}, generate coordinates of vertices for N faces."""
+
     unit_cell = unit_cell_positions(p, q)
-    # Calculate the distance between nearest neighbour in this lattice.
+    
+    # Calculate the distance between nearest neighbour in this lattice. 
+    # In a hyperbolic lattice, all neighbors are spearated by distance of d0.
     d0 = hyperbolic_distance(unit_cell[0], unit_cell[1])
+    
     # Generate the Fuchsian generators of the Bravais lattice.
     group_generators = fuchsian_generators(p_B, q_B)
-    # This list is used to store vertices that are not in the unit cell.
-    outer_rings = []
-    # This list is used to store redundant vertices. This happens when the vertices in the unit cell lie on the boundaries of the Bravais lattice.
-    redundant_indices = []
     
-    i = len(unit_cell)-1
-    # If N = 1, we return the unit cell.
-    if N == 1:
-        return unit_cell, redundant_indices
+    outer_rings = [] # Vertices not in the unit cell.
     
-    # This is the case when the vertices in the unit cell lie on the boundaries of the Bravais lattice.
-    if (p == 8 and q ==4) or (p == 12 and q ==4):
-        # We start by producing p_B new faces in the Bravais lattice by applying all the Fuchsian group generators to the unit cell.
-        for generator in group_generators:
-            for vertex in unit_cell:
-                new_vertex = create_new_vertex(vertex, generator)
-                i += 1
-                # Check if new_vertex is not in any of the vertices in D
-                if all(hyperbolic_distance(new_vertex, vertex) > (d0 - 0.15) for vertex in unit_cell + outer_rings):
-                    outer_rings.append(new_vertex)
-                else:
-                    outer_rings.append(new_vertex)
-                    redundant_indices.append(i)
-            
-    # This is the case when all vertices in the unit cell lie inside the Bravais lattice. There is no redundant vertices in this case.
-    else:
-        # We start by producing p_B new faces in the Bravais lattice by applying all the Fuchsian group generators to the unit cell.
-         for generator in group_generators:
-            for vertex in unit_cell:
-                new_vertex = create_new_vertex(vertex, generator)
-                outer_rings.append(new_vertex)
-  
-    # Next, we create more faces by applying more elements of the Fuchsian group to the unit cell. The number of new faces is the length of the extra_generators_indices list.
-    extra_generators_indices = []   
+    # We start by producing p_B new faces in the Bravais lattice by applying all the Fuchsian group generators
+    # to the unit cell.
+    for generator in group_generators:
+        for vertex in unit_cell:
+            new_vertex = create_new_vertex(vertex, generator)
+            outer_rings.append(new_vertex)
+
+    # Next, we create more faces by applying more elements of the Fuchsian group to the unit cell.
+    # The number of new faces is the length of the extra_generators_indices list.
+    extra_generators_indices = []
     if p_B == 8:
         if N == 12:
-            extra_generators_indices = [(1,2),(0,3),(2,2)]
+            extra_generators_indices = [(1, 2), (0, 3), (2, 2)]
         if N == 16:
-            extra_generators_indices = [(5,2),(2,0),(3,0),(4,0),(5,0),(6,0), (7,0)]
-            
+            extra_generators_indices = [(5, 2), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0)]
 
     for index_pair in extra_generators_indices:
         # For each pair of indices, we generate an element of the Fuchsian group by matrix multiplication.
         fuchsian_group_element = group_generators[index_pair[0]] @ group_generators[index_pair[1]]
-        # Again, we account for duplication for these lattices.
-        if not redundant_indices:
-            for vertex in unit_cell:
-                new_vertex = create_new_vertex(vertex, fuchsian_group_element)
+        for vertex in unit_cell:
+            new_vertex = create_new_vertex(vertex, fuchsian_group_element)
+            if all(hyperbolic_distance(new_vertex, vertex) > (d0 - 0.2) for vertex in unit_cell + outer_rings):
                 outer_rings.append(new_vertex)
-        else: 
-            for vertex in unit_cell:
-                new_vertex = create_new_vertex(vertex, fuchsian_group_element)
-                i += 1
-                if all(hyperbolic_distance(new_vertex, vertex) > (d0 - 0.2) for vertex in unit_cell + outer_rings):
-                    outer_rings.append(new_vertex)
-                else:
-                    outer_rings.append(new_vertex)
-                    redundant_indices.append(i)
-            
-            
+            else:
+                outer_rings.append(new_vertex)
+
     final_vertices = unit_cell + outer_rings
-    
-    return final_vertices, redundant_indices
 
-# This function takes as input a list of vertices positions and a list of the indices of redundant vertices. It returns the following:
-# 1) The graph G constructed from these vertices.
-# 2) The adjacency matrix adj_G of G.
-# 3) A dictionary vertices_to_edges mapping vertices to the edges connecting them.
-# 4) A dictionary edges_to_vertices mapping edges to the vertices at their endpoints.
-# 5) A dictionary pos_dict mapping each vertex in the graph to its position.
-def generate_hyperbolic_graph(vertices: list, redundant_indices: list, draw=False):
+    return final_vertices
+
+
+def generate_hyperbolic_graph(vertices: list, draw=False):
+    """Generate a Networkx graph from the given vertices positions.
     
-    # This dictionary stores the labels of all the edges in the graph.
+    Args:
+        vertices: list of positions for vertices
+        draw: whether to plot the graph
+
+    Returns:
+        G: a NetworkX graph constructed from the vertices. This graph represents the hyperbolic lattice
+        adj_G: the adjacency matrix of G
+        vertices_to_edges: a dict mapping vertices to the edges connecting them
+        edges_to_vertices: a dict mapping edges to the vertices at their endpoints
+        pos_dict: a dict mapping each vertex in the graph to its position
+
+    """
     vertices_to_edges = {}
-    
-    # This dictionary stores the two vertices at the endpoints of each edge in the graph
-    edges_to_vertices = {}
-    
-    # This is the distance between nearest neighbours in the hyperbolic lattice.
-    d0 = hyperbolic_distance(vertices[0], vertices[1])
-    
-    # This list stores the coordinates of every vertex in the graph (including redundant vertices).
-    coords = [(v.real, v.imag) for v in vertices]
-    
-    # Initialize the graph that mimics the hyperbolic lattice.
-    G = nx.Graph()
-    
-    # Add nodes to the graph with labels and positions.
-    if not redundant_indices:
-        for idx, pos in enumerate(coords):
-            G.add_node(idx, pos=pos, label=True)
-    else:
-        for idx, pos in enumerate(coords):
-            if idx not in redundant_indices:
-                G.add_node(idx, pos=pos, label=True)
 
-    edge_count = 0  # Counter for edge labels
-    
-    # This is the total number of vertices in the hyperbolic lattice.
+    edges_to_vertices = {}
+
+    d0 = hyperbolic_distance(vertices[0], vertices[1])
+
+    coords = [(v.real, v.imag) for v in vertices]
+
+    G = nx.Graph()
+
+    for idx, pos in enumerate(coords):
+        G.add_node(idx, pos=pos, label=True)
+
+    edge_count = 0
     n = len(vertices)
+    adj_G = np.zeros((n, n))
     
-    # Initialize the adjacency matrix of the graph
-    Adj_G = np.zeros((n,n))
     # Add edges to the graph and construct the adjacency matrix.
     for i, pos1 in enumerate(vertices):
-        for j, pos2 in enumerate(vertices[i + 1:], start=i + 1):
-            if not redundant_indices:
-                if hyperbolic_distance(pos1, pos2) < (d0 + 0.1):
-                    Adj_G[i][j] = 1
-                    Adj_G[j][i] = 1
-                    G.add_edge(i, j, with_labels=True)
-                    vertices_to_edges[(i, j)] = edge_count
-                    edges_to_vertices[edge_count] = (i, j)
-                    edge_count += 1
-            else:
-                if i not in redundant_indices and j not in redundant_indices:
-                    if hyperbolic_distance(pos1, pos2) < (d0 + 0.1):
-                        Adj_G[i][j] = 1
-                        Adj_G[j][i] = 1
-                        G.add_edge(i, j, with_labels=True)
-                        vertices_to_edges[(i, j)] = edge_count
-                        edges_to_vertices[edge_count] = (i, j)
-                        edge_count += 1
+        for j, pos2 in enumerate(vertices[i+1:], start=i+1):
+            if hyperbolic_distance(pos1, pos2) < (d0 + 0.1):
+                adj_G[i][j] = 1
+                adj_G[j][i] = 1
+                G.add_edge(i, j, with_labels=True)
+                vertices_to_edges[(i, j)] = edge_count
+                edges_to_vertices[edge_count] = (i, j)
+                edge_count += 1
 
+    pos_dict = {idx: (pos.real, pos.imag) for idx, pos in enumerate(vertices)}
 
-    # This dictionary stores the indices and positions of all the vertices in the graph
-    pos_dict = {idx: (pos.real,pos.imag) for idx, pos in enumerate(vertices) if idx not in redundant_indices}
-    
-
-    # if draw is True, draw the hyperbolic lattice with positions and labels.
     if draw:
-        plt.figure(figsize=(30, 30))  # Set figure size
-        # Draw the graph
+        plt.figure(figsize=(30, 30))
         nx.draw(
             G,
-            pos=pos_dict,  # Add node positions
-            node_size=20,  # Adjust node size
+            pos=pos_dict,
+            node_size=20,
             node_color="lightblue",
             with_labels=True,
-            font_size=12,  # Adjust font size for node labels
+            font_size=12,
             font_color="black"
         )
 
-        # Draw edge labels
         nx.draw_networkx_edge_labels(
             G,
             pos=pos_dict,
             edge_labels=vertices_to_edges,
-            font_size=12,  # Adjust font size for edge labels
-            label_pos=0.5,  # Adjust edge label position (closer to the center of edges)
+            font_size=12,
+            label_pos=0.5,
         )
 
-        plt.axis("equal")  # Ensure equal scaling
-        plt.show()  # Display the plot
+        plt.axis("equal")
+        plt.show()
 
-    return G, Adj_G, vertices_to_edges, edges_to_vertices, pos_dict
+    return G, adj_G, vertices_to_edges, edges_to_vertices, pos_dict
+
 
 def get_edge_labels_for_vertex(G: nx.Graph, vertex: int, vertices_to_edges: dict):
-    """Takes as input a graph and a vertex label and returns the labels of all edges incident on this node."""
+    """Takes as input a graph and a vertex label and returns the labels of all edges incident on this vertex."""
     incident_edges = list(G.edges(vertex))
     incident_edge_labels = {edge: vertices_to_edges[tuple(sorted(edge))] for edge in incident_edges}
     return incident_edge_labels.values()
+
 
 def get_edge_from_v1_v2(v1: int, v2: int, vertices_to_edges: dict):
     """Takes labels for two vertices for an edge and returns the corresponding edge label.
@@ -250,28 +210,17 @@ def get_edge_from_v1_v2(v1: int, v2: int, vertices_to_edges: dict):
     tup = tuple(sorted((v1, v2)))
     return vertices_to_edges[tup]
 
-def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list, N: int, CT: list, p_B: int, p: int, q: int):
-    # Get a list of positions of vertices in the unit cell.
-    unit_cell = unit_cell_positions(p, q)
-    n = len(unit_cell) 
 
-    # We use two different approaches to create the adjacency matrix of the periodic graph.
-    # The first approach when there is redundancy in the vertices.
-    # The second approach when there is no redundancy in the vertices.
-    if not redundant_indices:
-        unit_cell_graph = generate_hyperbolic_graph(unit_cell, redundant_indices)
-        # Adjacency matrix of the unit cell
-        V = nx.to_numpy_array(unit_cell_graph[0])  
-        I = np.identity(N)
-        A_l = np.kron(I, V)
-    else:
-        A_l = adjacency_matrix
-        
+def create_sparse_matrix(adjacency_matrix: np.array, N: int, CT: list, p_B: int, p: int, q: int):
+    unit_cell = unit_cell_positions(p, q)
+    n = len(unit_cell)
+
+    A_l = adjacency_matrix
+
     # Initialize the inter-cell matrices. These matrices dictate how to glue different unit cells together in the graph.
     T_matrices = [np.zeros((n, n)) for _ in range(p_B)]
 
     # Indices to be updated
-
     T_indices = [
         [[9, 12], [8, 13]],
         [[12, 9], [13, 8]],
@@ -281,7 +230,6 @@ def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list,
         [[15, 10], [14, 11]],
         [[11, 8], [12, 15]],
         [[8, 11], [15, 12]]]
-        
 
     # Update the T matrices
     for j in range(p_B):
@@ -289,89 +237,35 @@ def create_adjacency_matrix(adjacency_matrix: np.array, redundant_indices: list,
             T_matrices[j][k, l] = 1
 
     # Perform the update to A_l based on CT
-    if not redundant_indices:
-        # Perform the update to A_l based on CT
-        for alpha in range(p_B):  # Iterate over the T_matrices
-            for i in range(N):
-                # Create U matrix
-                U = np.zeros((N, N))
-                j = CT[alpha][i] - 1  # Adjust indexing for Python (0-based)
-                U[i, j] = 1
-                # Update A_l
-                A_l += np.kron(U, T_matrices[alpha])
-    else: 
-        # Perform the update to A_l based on CT
-        for alpha in range(p_B):  # Iterate over the T_matrices
-            for i in range(N):
-                # Create U matrix
-                U = np.zeros((N, N))
-                j = CT[alpha][i] - 1  # Adjust indexing for Python (0-based)
-                if i > 0 and  j > 0:
-                    U[i, j] = 1
-                    # Update A_l
-                    A_l += np.kron(U, T_matrices[alpha])
-                
+    for alpha in range(p_B):  # Iterate over the T_matrices
+        for i in range(N):
+            U = np.zeros((N, N))
+            j = CT[alpha][i] - 1  # Adjust indexing for Python (0-based)
+            U[i, j] = 1
+            A_l += np.kron(U, T_matrices[alpha])
 
-    # Convert A_l to a sparse matrix. Do we have to do this step or can we just convert it into COO right away.?
+    # Convert A_l to a sparse matrix.
     A_l_sparse = csr_matrix(A_l)
 
     # Convert to COO format to access row, col, and data attributes
     A_l_coo = coo_matrix(A_l_sparse)
-    
-    if not redundant_indices:
-        sparse_matrix = {(i, j): v for i, j, v in zip(A_l_coo.row, A_l_coo.col, A_l_coo.data)}
-    else:
-        # Step 1: Remove redundant indices from sparse matrix
-        initial_sparse_matrix = {(i, j): v for i, j, v in zip(A_l_coo.row, A_l_coo.col, A_l_coo.data) if i not in redundant_indices and j not in redundant_indices}
-        
-        # Step 2: Count occurrences of each vertex
-        vertex_count = Counter()
-        for u, v in initial_sparse_matrix.keys():
-            vertex_count[u] += 1
-            vertex_count[v] += 1
-        
-        # Step 3: Find redundant nodes
-        redundant_nodes = [node for node, count in vertex_count.items() if count != 2*q]
-        
-        # Step 4: Create a mapping for redundant nodes
-        redundant_mapping = {}
-        for i in range(0, len(redundant_nodes) - 1, 2):  
-            u, v = redundant_nodes[i], redundant_nodes[i+1]
-            redundant_mapping[v] = u  # Map v → u
-            
-        # Step 5: Update the sparse matrix without modifying non-redundant edges
-        sparse_matrix = {}
-        for (i, j), v in initial_sparse_matrix.items():
-            # If neither i nor j are redundant, keep the edge unchanged
-            if i not in redundant_mapping and j not in redundant_mapping:
-                sparse_matrix[(i, j)] = v
-            elif i in redundant_nodes and j in redundant_nodes:
-                continue
-            else:
-                # Replace only redundant nodes with their mapped values
-                new_i = redundant_mapping.get(i, i)
-                new_j = redundant_mapping.get(j, j)
-                sparse_matrix[(new_i, new_j)] = v  # Preserve edge direction
-    
-    
-    for (i,j), v in sparse_matrix.items():
-        if (j,i) not in sparse_matrix:
-            raise ValueError("The sparse matrix is not symmetric")
-        
-    # Step 2: Count occurrences of each vertex
+
+    sparse_matrix = {(i, j): v for i, j, v in zip(A_l_coo.row, A_l_coo.col, A_l_coo.data)}
+
+    # Check validity of sparse matrix
+    for (i, j), v in sparse_matrix.items():
+        if (j, i) not in sparse_matrix:
+            raise Exception("The sparse matrix is not symmetric")
+
     vertex_count = Counter()
     for u, v in sparse_matrix.keys():
         vertex_count[u] += 1
         vertex_count[v] += 1
-
-    # Step 3: Find redundant nodes
-    degree_check = all(count == 2*q for node, count in vertex_count.items())
+    degree_check = all(count == 2 * q for node, count in vertex_count.items())
     if not degree_check:
-        print([(node, count) for node,count in vertex_count.items() if count != 2*q])
-        raise ValueError("Some nodes do not appear 8 times in the sparse matrix")
-    # else:
-    #     print(sparse_matrix)
-        
+        print([(node, count) for node, count in vertex_count.items() if count != 2 * q])
+        raise Exception("Some nodes do not appear the correct number of times in the sparse matrix")
+
     return sparse_matrix
 
 def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edges_to_vertices: dict, sparse_matrix: dict, vertices_positions: dict, draw=False):
@@ -930,16 +824,17 @@ def run_trial(args):
     return is_err
 
 def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
-    trials = 5000
+    trials = 10000
     error_percentages = []
     for ep in error_probabilities:
         print(f"Processing error probability {ep} for the graph with {periodic_graph.number_of_edges()} qubits")
         args_list = [(periodic_graph, vertices_to_edges, ep, logical_operators) for _ in range(trials)]
-        with Pool(processes=multiprocessing.cpu_count()) as pool:
+        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
             results = pool.map(run_trial, args_list)
         count = sum(results)
         error_percentages.append(count / trials)
     return error_percentages
+
 
 def find_code_distance(logical_operators, periodic_graph):
     distance = 100
@@ -954,7 +849,7 @@ def find_code_distance(logical_operators, periodic_graph):
                 Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
             else:
                 Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
-        
+
         for v in operator_vertices:
             start = v
             end = (start, 1)
@@ -962,84 +857,84 @@ def find_code_distance(logical_operators, periodic_graph):
             path = nx.shortest_path(Gi, start, end)
             if length < operator_len:
                 operator_len = length
-        
+
         if operator_len < distance:
             distance = operator_len
     return distance
+
+
 if __name__ == '__main__':
     p = 8
     q = 3
     p_B = 8
     q_B = 8
-    
-    if p_B == 8:
-        CT_matrices_dic = {                
-            # Abelian Subgroup, NSG[365]
-            9: [ [ 2, 3, 1, 6, 8, 9, 5, 7, 4 ], 
-                 [ 3, 1, 2, 9, 7, 4, 8, 5, 6 ], 
-                 [ 4, 6, 9, 5, 1, 8, 3, 2, 7 ], 
-                 [ 5, 8, 7, 1, 4, 2, 9, 6, 3 ], 
-                 [ 6, 9, 4, 8, 2, 7, 1, 3, 5 ], 
-                 [ 7, 5, 8, 3, 9, 1, 6, 4, 2 ], 
-                 [ 8, 7, 5, 2, 6, 3, 4, 9, 1 ], 
-                 [ 9, 4, 6, 7, 3, 5, 2, 1, 8 ] ],
-            
-            
-            # Abelian Subgroup, NSG[2872]
-            12: [ [ 2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8 ], 
-                  [ 3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9 ], 
-                  [ 4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5 ], 
-                  [ 5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4 ], 
-                  [ 6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11 ], 
-                  [ 7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10 ], 
-                  [ 8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2 ], 
-                  [ 9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3 ] ],
 
-                    
-#             # Abelian Subgroup, NSG[10425]
-            16: [ [ 2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8 ], 
-                  [ 3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9 ], 
-                  [ 4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12 ], 
-                  [ 5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13 ], 
-                  [ 6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14 ], 
-                  [ 7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11 ], 
-                  [ 8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2 ], 
-                  [ 9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3 ] ]
-            }
-        
-    
-    plt.figure(figsize=(10, 10)) 
+    if p_B == 8:
+        CT_matrices_dic = {
+
+            # Abelian Subgroup, NSG[365]
+            9: [[2, 3, 1, 6, 8, 9, 5, 7, 4],
+                [3, 1, 2, 9, 7, 4, 8, 5, 6],
+                [4, 6, 9, 5, 1, 8, 3, 2, 7],
+                [5, 8, 7, 1, 4, 2, 9, 6, 3],
+                [6, 9, 4, 8, 2, 7, 1, 3, 5],
+                [7, 5, 8, 3, 9, 1, 6, 4, 2],
+                [8, 7, 5, 2, 6, 3, 4, 9, 1],
+                [9, 4, 6, 7, 3, 5, 2, 1, 8]],
+
+            # Abelian Subgroup, NSG[2872]
+            12: [[2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8],
+                 [3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9],
+                 [4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5],
+                 [5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4],
+                 [6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11],
+                 [7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10],
+                 [8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2],
+                 [9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3]],
+
+            # Abelian Subgroup, NSG[10425]
+            16: [[2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8],
+                 [3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9],
+                 [4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12],
+                 [5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13],
+                 [6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14],
+                 [7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11],
+                 [8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2],
+                 [9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3]]
+        }
+
+    plt.figure(figsize=(10, 10))
 
     colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']
-    error_probabilities = [0.05 * j for j in range(11)]
+    error_probabilities = [0.01 * j for j in range(28)]
     for idx, N in enumerate(CT_matrices_dic):
-        G_vertices, redundant_vertices = generate_vertices(p, q, p_B, q_B, N)
+        G_vertices = generate_vertices(p, q, p_B, q_B, N)
+
+        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, draw=True)
         
-        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, redundant_vertices, draw=False)
-        
-        sparse_matrix = create_adjacency_matrix(adj_G, redundant_vertices, N, CT_matrices_dic[N], p_B, p, q)
-        
+        sparse_matrix = create_sparse_matrix(adj_G, N, CT_matrices_dic[N], p_B, p, q)
+
         periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict)
-        
+
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
 
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         d = find_code_distance(logical_operators, periodic_G)
-        
+
         error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
-        
+
         plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
                  color=colors[idx % len(colors)], label=f'[[n={n}, k={k}, d={d}]]')
 
 
     plt.xlabel('Physical Error Probabilities')
     plt.ylabel('Logical Error Probabilities')
-    plt.title('Error Threshold Graph')
+    plt.title('{8,3} HQECC Error Threshold Graph')
     plt.legend()
     plt.grid(True)
     end = time.time()
     print(end - start)
-    plt.show() 
+    plt.show()
 
