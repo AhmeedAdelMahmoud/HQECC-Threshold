@@ -13,18 +13,16 @@
 # limitations under the License.
 
 import copy
+import multiprocessing
+import time
+from collections import Counter
+
+import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-import networkx as nx
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit_aer import AerSimulator
-from multiprocessing import Pool
-import multiprocessing
-from collections import Counter
-import bisect
-import time
-from networkx.utils import pairwise
-from scipy.sparse import coo_matrix, csr_matrix, kron
+from scipy.sparse import coo_matrix, csr_matrix
 from sympy.core.containers import OrderedSet
 
 start = time.time()
