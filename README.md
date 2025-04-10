@@ -9,7 +9,7 @@ It's recommended to use a version of python >= 3.10.6
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-python Hyperbolic_Code_Threshold.py
+python hyperbolic_code_threshold.py
 ```
 The python file is the same file that was used to generate Figure 3 in the paper. We encourage reading through the code carefully before running it. Here is a brief overview of what the code does.
 
@@ -19,6 +19,9 @@ A periodic {p, q} hyperbolic lattice with N faces and its corresponding quantum 
 To speed up the trials, we utilize Python's multiprocessing library. For 10000 trials, it takes 6+ hours on an 8-core machine to generate the figure. The number of trials can be adjusted to control the accuracy and runtime.
 
 Some drawings have been turned off by default. This can be overriden as desired by setting `draw=True` in the various places where it is currently set to `False`. 
+
+## Algorithm annotation
+The paper describes three algorithms in detail. To make it easier to know where in the python file those algorithms are, we have annotated the code with commented lines such as `# Algorithm 1 Step 2` and `# Algorithm 3 Step 5`.
 
 ## Feedback
 We would love to hear your thoughts! If you have ideas for improvement or see a problem, feel free to open an issue in this repo [here](https://github.com/AhmeedAdelMahmoud/HQECC-Threshold/issues).

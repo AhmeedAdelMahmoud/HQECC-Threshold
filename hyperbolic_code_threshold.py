@@ -84,17 +84,20 @@ def create_new_vertex(vertex_position: complex, translation_matrix: np.array):
 def generate_vertices(p: int, q: int, p_B: int, q_B: int, N: int, extra_generators_indices: list):
     """For the {p,q} lattice in the Bravais lattice {p_B, q_B}, generate coordinates of vertices for N faces."""
 
+    # Algorithm 1 Step 1
     unit_cell = unit_cell_positions(p, q)
     
     # Calculate the distance between nearest neighbour in this lattice. 
     # In a hyperbolic lattice, all neighbors are spearated by distance of d0.
     d0 = hyperbolic_distance(unit_cell[0], unit_cell[1])
     
+    # Algorithm 1 Step 2
     # Generate the Fuchsian generators of the Bravais lattice.
     group_generators = fuchsian_generators(p_B, q_B)
     
     outer_rings = [] # Vertices not in the unit cell.
     
+    # Algorithm 1 Step 3 (part 1)
     # We start by producing p_B new faces in the Bravais lattice by applying all the Fuchsian group generators
     # to the unit cell.
     for generator in group_generators:
@@ -151,6 +154,7 @@ def generate_hyperbolic_graph(vertices: list, draw=False):
     n = len(vertices)
     adj_G = np.zeros((n, n))
     
+    # Algorithm 1 Step 3 (part 2)
     # Add edges to the graph and construct the adjacency matrix.
     for i, pos1 in enumerate(vertices):
         for j, pos2 in enumerate(vertices[i+1:], start=i+1):
@@ -350,17 +354,21 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     cycle_basis = []
     all_faces = []
     all_nodes = [node for node, degree in original_graph.degree() if degree < q] 
+    
+    # Algorithm 3 Step 1
+    nx_cycle_basis = nx.minimum_cycle_basis(original_graph)
+    original_cycles_length = len(nx_cycle_basis)
 
+    # Algorithm 3 Step 2
     tree_edges = list(nx.minimum_spanning_edges(periodic_graph, data=False))
     chords = periodic_graph.edges - tree_edges - {(v, u) for u, v in tree_edges}
     
     # Recall that every cycle C (and every witness S) is given as a vector in the chords, that is every cycle (and every witness S) is given as a vector v \in {0,1}^N
     set_orth = [{tuple(sorted(edge))} for edge in chords] # set of vectors orthogonal to cycles found so far
     print(f"The initial length of the set_orth is {len(set_orth)}")
-    nx_cycle_basis = nx.minimum_cycle_basis(original_graph)
-    original_cycles_length = len(nx_cycle_basis)
     
-    # Step 1: Extracting plaquettes from the original graph.
+    
+    # Algorithm 3 Step 3: Extracting plaquettes from the original graph.
     while len(cycle_basis) < original_cycles_length:
         for i, base in enumerate(set_orth):
             valid_cycles, cycle_edges = valid_cycle_basis(nx_cycle_basis[0], base)
@@ -379,13 +387,12 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
                             ]
                 break
     
-    print(f"The length of remaining cycles from the original graph is {len(nx_cycle_basis)}")    
 
     num_plaquettes = periodic_graph.number_of_edges()*2/p
     print("num_plaquettes", num_plaquettes)
     
     print("len(set_orth) before p_cycles", len(set_orth))
-   # Step 2: Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
+    # Algorithm 3 Step 4: Extracting extra plaquettes that were added due to imposing periodic boundary conditions.
     while len(all_faces) < num_plaquettes:
         cycle_edges = p_cycles(periodic_graph, set_orth, cycle_basis, num_plaquettes, all_nodes, p)
         if cycle_edges:
@@ -394,7 +401,7 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
                 cycle_basis.append(cycle_edges)
     print("len of cycle_basis after p_cycles", len(cycle_basis))
     
-    # Step 3: Find all non_trivial cycles (which form the logical operators)
+    # Algorithm 3 Step 5: Find all non_trivial cycles (which form the logical operators)
     logical_operators = []
     first_logical_operator = first_non_trivial_cycle_(periodic_graph, set_orth, all_faces)
     logical_operators.append(first_logical_operator)
@@ -422,7 +429,6 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     if set_orth:
         raise Exception("The number of cycles in the cycle basis is not E-V+1")
     print(f"The number of cycles in total is {len(cycle_basis)}")
-    print(f"The remaining number of cycles in the basis is {len(set_orth)}")
     non_trivial_cycles_ = [cycle for cycle in cycle_basis if cycle not in all_faces]
     return cycle_basis, all_faces, logical_operators      
             
@@ -701,7 +707,7 @@ def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_
         error_percentages.append(count / trials)
     return error_percentages
 
-
+# Algorithm 2
 def find_code_distance(logical_operators, periodic_graph):
     distance = 100
     for logical_operator in logical_operators:
@@ -780,19 +786,26 @@ if __name__ == '__main__':
     error_percentages = []
     all_params = []
     for idx, N in enumerate(CT_matrices_dic):
+        # Algorithm 1 Steps 1-3
         G_vertices = generate_vertices(p, q, p_B, q_B, N, extra_generators_indices[N])
 
+        # Algorithm 1 Step 3 (part 2)
         G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, draw=False)
         
+        # Algorithm 1 Step 4
         sparse_matrix = create_sparse_matrix(adj_G, N, CT_matrices_dic[N], p_B, p, q)
 
+        # Algorithm 1 Step 5
         periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict, draw=False)
 
+        # Algorithm 3
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
+        
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
-        d = find_code_distance(logical_operators, periodic_G)
+        d = find_code_distance(logical_operators, periodic_G) # Algorithm 2
+        
         all_params.append((n,k,d))
 
         error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators, trials)
