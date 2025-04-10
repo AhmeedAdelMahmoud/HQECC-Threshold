@@ -81,7 +81,7 @@ def create_new_vertex(vertex_position: complex, translation_matrix: np.array):
     return new_vertex_position
 
 
-def generate_vertices(p: int, q: int, p_B: int, q_B: int, N: int):
+def generate_vertices(p: int, q: int, p_B: int, q_B: int, N: int, extra_generators_indices: list):
     """For the {p,q} lattice in the Bravais lattice {p_B, q_B}, generate coordinates of vertices for N faces."""
 
     unit_cell = unit_cell_positions(p, q)
@@ -104,13 +104,6 @@ def generate_vertices(p: int, q: int, p_B: int, q_B: int, N: int):
 
     # Next, we create more faces by applying more elements of the Fuchsian group to the unit cell.
     # The number of new faces is the length of the extra_generators_indices list.
-    extra_generators_indices = []
-    if p_B == 8:
-        if N == 12:
-            extra_generators_indices = [(1, 2), (0, 3), (2, 2)]
-        if N == 16:
-            extra_generators_indices = [(5, 2), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0)]
-
     for index_pair in extra_generators_indices:
         # For each pair of indices, we generate an element of the Fuchsian group by matrix multiplication.
         fuchsian_group_element = group_generators[index_pair[0]] @ group_generators[index_pair[1]]
@@ -172,7 +165,7 @@ def generate_hyperbolic_graph(vertices: list, draw=False):
     pos_dict = {idx: (pos.real, pos.imag) for idx, pos in enumerate(vertices)}
 
     if draw:
-        plt.figure(figsize=(30, 30))
+        plt.figure(figsize=(10, 10))
         nx.draw(
             G,
             pos=pos_dict,
@@ -268,28 +261,30 @@ def create_sparse_matrix(adjacency_matrix: np.array, N: int, CT: list, p_B: int,
 
     return sparse_matrix
 
-def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edges_to_vertices: dict, sparse_matrix: dict, vertices_positions: dict, draw=False):
+
+def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edges_to_vertices: dict,
+                          sparse_matrix: dict, vertices_positions: dict, draw=False):
     """
     Finds all the new edges based on periodic boundary condition, then adds those edges to a copy of the original graph.
-    1. Check if every nonzero element in the adjacency matrix of G is also in the sparse matrix file.
-    2. If all edges in G exist in the file, add missing edges from the adjacency matrix file to G.
+    1. Check if every nonzero element in the adjacency matrix of G is also in the sparse matrix.
+    2. If all edges in G exist in the matrix, add missing edges from the adjacency matrix to G.
     """
 
     periodic_G = copy.deepcopy(original_graph)
 
-    # Step 2: Add edges from the sparse matrix file to G if they are not present in G
+    # Add edges from the sparse matrix to G if they are not present in G
     edges_added = []
     edge_count = len(periodic_G.edges())
     for (i, j) in sparse_matrix.keys():
-        if not periodic_G.has_edge(i, j):  # If the edge is not in G, add it
+        if not periodic_G.has_edge(i, j):
             if i in periodic_G.nodes and j in periodic_G.nodes:
-                periodic_G.add_edge(int(i), int(j), with_labels = True)
+                periodic_G.add_edge(int(i), int(j), with_labels=True)
                 vertices_to_edges[(i, j)] = edge_count
                 edges_to_vertices[edge_count] = (i, j)
                 edges_added.append((i, j))
                 edge_count += 1
             else:
-                raise ValueError(f"Could not add edge; nodes ({i}, {j}) not in graph")
+                raise Exception(f"Could not add edge; nodes ({i}, {j}) not in graph")
 
     if draw:
         plt.figure(figsize=(20, 20))
@@ -310,6 +305,7 @@ def add_periodicity_edges(original_graph: nx.Graph, vertices_to_edges: dict, edg
             label_pos=0.5,
         )
     return periodic_G
+
 
 def generate_bit_flip_circuit(graph: nx.Graph, error_prob: int, vertices_to_edges: dict):
     """Takes the graph as input and generates the corresponding quantum circuit for bit flip error in Qiskit. 
@@ -346,22 +342,20 @@ def generate_bit_flip_circuit(graph: nx.Graph, error_prob: int, vertices_to_edge
 
     return qc, affected_edges
 
+
 def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p: int, q: int):
-    """Based on the Networkx implentation of minimum_cycle_basis. Find a cycle basis for the periodic graph
-    to ensure all cycles and logical operators are found."""
+    """Find a cycle basis for the periodic graph to ensure all cycles and logical operators are found. 
+    Based on the Networkx implentation of , which is in turn based on the paper http://link.springer.com/article/10.1007/s00453-007-9064-z."""
 
     cycle_basis = []
     all_faces = []
     all_nodes = [node for node, degree in original_graph.degree() if degree < q] 
-    # We extract the edges not in a spanning tree. We do not really need a
-    # *minimum* spanning tree. That is why we call the next function with
-    # weight=None. Depending on implementation, it may be faster as well
-    tree_edges = list(nx.minimum_spanning_edges(periodic_graph, data = False))
+
+    tree_edges = list(nx.minimum_spanning_edges(periodic_graph, data=False))
     chords = periodic_graph.edges - tree_edges - {(v, u) for u, v in tree_edges}
     
-    # We maintain a set of vectors orthogonal to sofar found cycles
     # Recall that every cycle C (and every witness S) is given as a vector in the chords, that is every cycle (and every witness S) is given as a vector v \in {0,1}^N
-    set_orth = [{tuple(sorted(edge))} for edge in chords]
+    set_orth = [{tuple(sorted(edge))} for edge in chords] # set of vectors orthogonal to cycles found so far
     print(f"The initial length of the set_orth is {len(set_orth)}")
     nx_cycle_basis = nx.minimum_cycle_basis(original_graph)
     original_cycles_length = len(nx_cycle_basis)
@@ -369,7 +363,7 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     # Step 1: Extracting plaquettes from the original graph.
     while len(cycle_basis) < original_cycles_length:
         for i, base in enumerate(set_orth):
-            valid_cycles, cycle_edges = valid_cycle_basis(nx_cycle_basis[0], base, p)
+            valid_cycles, cycle_edges = valid_cycle_basis(nx_cycle_basis[0], base)
             if valid_cycles:
                 cycle_basis.append(cycle_edges)
                 all_faces.append(cycle_edges) 
@@ -402,17 +396,15 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     
     # Step 3: Find all non_trivial cycles (which form the logical operators)
     logical_operators = []
-    first_logical_operator = first_non_trivial_cycle_(periodic_graph,set_orth,all_faces)
+    first_logical_operator = first_non_trivial_cycle_(periodic_graph, set_orth, all_faces)
     logical_operators.append(first_logical_operator)
     cycle_basis.append(first_logical_operator)
-
 
     first_operator_vertices = set()
     for u, v in first_logical_operator:
         first_operator_vertices.add(u)
         first_operator_vertices.add(v)
 
-    print("len(set_orth) before non_trivial", len(set_orth))
     for base_point in first_operator_vertices:
         set_orth_copy = copy.deepcopy(set_orth)
         found_logical_operators = []
@@ -426,13 +418,9 @@ def hyperbolic_cycle_basis(original_graph: nx.Graph, periodic_graph: nx.Graph, p
     set_orth = set_orth_copy
     logical_operators.extend(found_logical_operators)
     cycle_basis.extend(found_logical_operators)
-    print("len(logical_operators)", len(logical_operators))
-        
-    print("length of logical_op after non_trivia_cycles", len(logical_operators))
-
 
     if set_orth:
-        raise ValueError("The number of cycles in the cycle basis is not E-V+1")
+        raise Exception("The number of cycles in the cycle basis is not E-V+1")
     print(f"The number of cycles in total is {len(cycle_basis)}")
     print(f"The remaining number of cycles in the basis is {len(set_orth)}")
     non_trivial_cycles_ = [cycle for cycle in cycle_basis if cycle not in all_faces]
@@ -460,9 +448,7 @@ def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_pl
             
             if potential_plaquettes:
                 for plaquette in potential_plaquettes:
-                    # We need to check that this condiiton is valid (plaquette and cycle_basis have same type)
                     if plaquette not in cycle_basis:
-                        # Check that this notation is correct
                         valid_plaquette = all(len(plaquette.intersection(cycle))<= 1 for cycle in cycle_basis)
                         if valid_plaquette:
                             chosen_plaquette = plaquette
@@ -484,10 +470,9 @@ def p_cycles(periodic_graph: nx.Graph, set_orth: list, cycle_basis: list, num_pl
     
     return chosen_plaquette   
     
-def valid_cycle_basis(cycle: list, S: dict, p: int):
+def valid_cycle_basis(cycle: list, S: dict):
     """
-    This function a cycle from nx.minimum_cycle_basis and checks if it is a valid cycle for a given base S
-    by checking the condition that <C,S> = 1.
+    Check if cycle is a valid cycle for a given base S by checking that <C,S> = 1.
     """
     # First convert the list cycle to a set of edges.
     plaquette_edges = OrderedSet()
@@ -512,9 +497,9 @@ def find_unique_paths_dfs(G: nx.Graph, source: int, target: int, p: int):
                     u, v = path[i], path[i + 1]
                     if type(u) is tuple:
                         u = u[0]
-                    if type(v) is tuple: 
+                    if type(v) is tuple:
                         v = v[0]
-                    normalized_edges.add(tuple(sorted((u, v)))) 
+                    normalized_edges.add(tuple(sorted((u, v))))
                 if normalized_edges not in paths_list:
                     paths_list.append(normalized_edges)
             return
@@ -530,11 +515,12 @@ def find_unique_paths_dfs(G: nx.Graph, source: int, target: int, p: int):
 
     return paths_list
 
+
 def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
     """This function is the same as non_trivial_cycles, but it stops after finding the first non_trivial_cycle
     and returns a base point to be used to find the remaining non-trivial cycles, since they all should pass by a base point."""
     Gi = nx.Graph()
-    
+
     for base in set_orth:
         # Add 2 copies of each edge in G to Gi.
         # If edge is in orth, add cross edge; otherwise in-plane edge
@@ -543,14 +529,12 @@ def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
                 Gi.add_edges_from([(u, (v, 1)), ((u, 1), v)])
             else:
                 Gi.add_edges_from([(u, v), ((u, 1), (v, 1))])
-    
+
         # find the shortest length in Gi between n and (n, 1) for each n
-        # Note: Use "Gi_weight" for name of weight attribute
         spl = nx.shortest_path_length
         lift = {node: spl(Gi, source=node, target=(node, 1)) for node in G}
         sorted_lift = dict(sorted(lift.items(), key=lambda item: item[1]))
-        
-        
+
         found = False
         for node, length in sorted_lift.items():
             start = node
@@ -561,20 +545,21 @@ def first_non_trivial_cycle_(G: nx.Graph, set_orth: list, all_faces: list):
                     non_trivial_cycle = potential_path
                     set_orth.remove(base)
                     set_orth = [
-                            ({e for e in orth if e not in base } | {e for e in base if e not in orth})
-                                if sum((e in orth) for e in non_trivial_cycle) % 2
-                            
-                            else orth
-                            for orth in set_orth
-                                    ]
+                        ({e for e in orth if e not in base} | {e for e in base if e not in orth})
+                        if sum((e in orth) for e in non_trivial_cycle) % 2
+
+                        else orth
+                        for orth in set_orth
+                    ]
                     found = True
                     break
             if found:
                 break
         if found:
             break
-    
+
     return non_trivial_cycle
+
 
 def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point: int):
     """
@@ -582,7 +567,7 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
     orthogonal to the vector orth as per [p. 338, 1]
     Use (u, 1) to indicate the lifted copy of u (denoted u' in paper).
     """
-    
+
     Gi = nx.Graph()
 
     found = False
@@ -607,20 +592,21 @@ def non_trivial_cycles(G: nx.Graph, set_orth: list, all_faces: list, base_point:
                 non_trivial_cycle = potential_path
                 set_orth.remove(base)
                 set_orth = [
-                        ({e for e in orth if e not in base } | {e for e in base if e not in orth})
-                        if sum((e in orth) for e in non_trivial_cycle) % 2
-                        
-                        else orth
-                        for orth in set_orth
-                                ]
+                    ({e for e in orth if e not in base} | {e for e in base if e not in orth})
+                    if sum((e in orth) for e in non_trivial_cycle) % 2
+
+                    else orth
+                    for orth in set_orth
+                ]
                 found = True
                 break
         if found:
             break
     if not found:
         error = True
-    
+
     return non_trivial_cycle, error
+
 
 def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict):
     """Convert logical operators from a list of pairs of vertices (v1,v2) to edge labels."""
@@ -629,135 +615,17 @@ def logical_operators_to_edges(logical_operators: list, vertices_to_edges: dict)
     for logical_operator in logical_operators:
         lg_edges = set()
         for pair in logical_operator:
-            lg_edges.add(
-            get_edge_from_v1_v2(pair[0], pair[1], vertices_to_edges))
+            lg_edges.add(get_edge_from_v1_v2(pair[0], pair[1], vertices_to_edges))
         logical_operators_edges.append(lg_edges)
     return logical_operators_edges
-
-def generate_dual_graph(all_faces: list, p: int, vertices_to_edges: dict, G_pos_dict: dict, draw=False):
-    """Generate the dual graph which replaces each plaquette with a vertix. Used for computing the phase flip circuit."""
-    G_dual_graph = nx.Graph()
-
-
-    pos_dict = {}
-
-    # For each face in graph, add a node to dual graph with its position at the average of all the face's nodes
-    for i, plaquette in enumerate(all_faces):
-        plaquette_vertices = set()
-        for pair in plaquette:
-            plaquette_vertices.add(pair[0])
-            plaquette_vertices.add(pair[1])
-        
-        x_pos = 0.0
-        y_pos = 0.0
-        for v in plaquette_vertices:
-            x_pos += G_pos_dict[v][0]
-            y_pos += G_pos_dict[v][1]
-        x_pos = x_pos/p
-        y_pos = y_pos/p
-        pos = (x_pos, y_pos)
-        pos_dict[i] = pos
-
-        G_dual_graph.add_node(i, pos=pos, label = True)
-        
-    intersection_edges = {}
-    
-    for i, cycle1 in enumerate(all_faces):
-        for j, cycle2 in enumerate(all_faces[i+1:], start=i+1):
-            intersection = list(cycle1.intersection(cycle2))
-            if len(intersection) == 1:
-                label = get_edge_from_v1_v2(intersection[0][0],intersection[0][1], vertices_to_edges)
-                G_dual_graph.add_edge(i, j, label=label)
-                intersection_edges[(i,j)] = label
-            elif len(intersection) == 0:
-                continue
-            else:
-                raise ValueError(f"The intersection between two faces {i} and {j} is {len(cycle1.intersection(cycle2))}")
-
-
-    if draw:
-        plt.figure(figsize=(10, 10)) 
-       
-        nx.draw(
-            G_dual_graph,
-            pos=pos_dict,
-            node_size=20, 
-            node_color="lightblue",
-            with_labels=True,
-            font_size=12, 
-            font_color="black"
-            )
-        nx.draw_networkx_edge_labels(
-            G_dual_graph,
-            pos=pos_dict,
-            edge_labels=intersection_edges,
-            font_size=10,
-            label_pos=0.5,
-        )
-        plt.show()
-        
-    return G_dual_graph, intersection_edges
-
-def generate_phase_flip_circuit(periodic_G: nx.Graph, all_faces: list, graph_vertices_to_edges: dict, err_prob: float):
-    affected_edges = []
-    num_plaquettes = len(all_faces)
-    print('num_vertices', num_plaquettes)
-    num_edges = periodic_G.number_of_edges()
-    print('num_edges', num_edges)
-
-    plaquette_ancilla_qubits = QuantumRegister(num_plaquettes, 'plaquette_ancilla_qubits')
-    edges_qubits = QuantumRegister(num_edges, 'edges_qubits')
-    cr = ClassicalRegister(num_plaquettes, 'cr')
-
-    qc = QuantumCircuit()
-    qc.add_register(plaquette_ancilla_qubits)
-    qc.add_register(edges_qubits)
-    qc.add_register(cr)
-
-    # H on all qubits to change basis
-    for i in range(num_plaquettes):
-        qc.h(plaquette_ancilla_qubits[i])
-    for j in range(num_edges):
-        qc.h(edges_qubits[j])
-    qc.barrier()
-
-    # add random Z errors
-    for j in range(num_edges):
-        random_number = np.random.rand()
-        if random_number < err_prob:
-            qc.z(edges_qubits[j])
-            affected_edges.append(j)
-    qc.barrier()
-    
-
-    # CX between centre ancilla and neighboring edges
-    for i, plaquette in enumerate(all_faces):
-        for edge in plaquette:
-            edge_label = get_edge_from_v1_v2(edge[0], edge[1], graph_vertices_to_edges)
-            qc.cx(plaquette_ancilla_qubits[i], edges_qubits[edge_label])
-        qc.barrier()
-    qc.barrier()
-        
-    # H on all again
-    for i in range(num_plaquettes):
-        qc.h(plaquette_ancilla_qubits[i])
-    for j in range(num_edges):
-        qc.h(edges_qubits[j])
-    qc.barrier()
-
-    # Z measurement
-    for v in range(num_plaquettes):
-        qc.measure(plaquette_ancilla_qubits[v], cr[v])
-
-    return qc, affected_edges
 
 def generate_syndrome_graph(indices: list, graph: nx.Graph, draw=False):
     syndrome_graph = nx.Graph()
     for v in indices:
-        syndrome_graph.add_node(v, label = True)
+        syndrome_graph.add_node(v, label=True)
 
     for i, ver1 in enumerate(indices):
-        for j, ver2 in enumerate(indices[i+1:], start=i+1):
+        for j, ver2 in enumerate(indices[i + 1:], start=i + 1):
             weight = nx.shortest_path_length(graph, source=ver1, target=ver2)
             syndrome_graph.add_edge(ver1, ver2, weight=weight)
 
@@ -766,30 +634,27 @@ def generate_syndrome_graph(indices: list, graph: nx.Graph, draw=False):
         pos = nx.spring_layout(syndrome_graph)  # Positioning for better visualization
         nx.draw(syndrome_graph, pos, with_labels=True, node_color="lightblue", node_size=500)
 
-        # Add edge labels showing the weights
-        edge_labels_with_weight = nx.get_edge_attributes(syndrome_graph, 'weight')  # Retrieve weights
+        edge_labels_with_weight = nx.get_edge_attributes(syndrome_graph, 'weight')
         nx.draw_networkx_edge_labels(syndrome_graph, pos, edge_labels=edge_labels_with_weight)
-    
+
         # Show the graph
         plt.show()
     return syndrome_graph
 
+
 def find_correction_paths(syndrome_graph: nx.Graph, periodic_graph: nx.Graph):
-    # Find the MWPM from the syndrome graph because edges are weights, 
-    # then find the actual correction path using the periodic graph because syndrom graph doesnt contain all nodes
-    matching = nx.algorithms.matching.min_weight_matching(syndrome_graph)
+    matching = nx.algorithms.matching.min_weight_matching(syndrome_graph) # Find the MWPM from the syndrome graph because edges are weights
 
     correction_paths = []
-    
     for edge in matching:
-        path = nx.shortest_path(periodic_graph, source=edge[0], target=edge[1])
+        path = nx.shortest_path(periodic_graph, source=edge[0], target=edge[1]) # Use the periodic graph to find correction path because syndrom graph doesnt contain all nodes
         correction_paths.append(path)
     return correction_paths
 
+
 def get_logical_error(affected_edges: list, correction_paths: list, vertices_to_edges: dict, logical_operators: list):
-    
     logical_operators_edges = logical_operators_to_edges(logical_operators, vertices_to_edges)
-    
+
     affected_edges_set = set(affected_edges)
     all_correction_edges = set()
     for correction_path in correction_paths:
@@ -803,13 +668,14 @@ def get_logical_error(affected_edges: list, correction_paths: list, vertices_to_
     intersection = all_correction_edges.intersection(affected_edges_set)
     union = all_correction_edges.union(affected_edges_set)
     potential_logical_error = union - intersection
-    
+
     for logical_operator in logical_operators_edges:
         common_edges = potential_logical_error.intersection(logical_operator)
         if len(common_edges) % 2 == 1:
             return True
-    
+
     return False
+
 
 def run_trial(args):
     periodic_graph, vertices_to_edges, ep, logical_operators = args
@@ -818,13 +684,13 @@ def run_trial(args):
     result = simulator.run(qcc, shots=1).result().get_counts()
     syndrome_measurement = next(iter(result))[::-1]
     indices = [j for j, bit in enumerate(syndrome_measurement) if bit == "1"]
-    syndrome_graph = generate_syndrome_graph(indices, periodic_graph)
+    syndrome_graph = generate_syndrome_graph(indices, periodic_graph, draw=False)
     correction_paths = find_correction_paths(syndrome_graph, periodic_graph)
     is_err = get_logical_error(affected_edges, correction_paths, vertices_to_edges, logical_operators)
     return is_err
 
-def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators):
-    trials = 10000
+
+def error_graph(periodic_graph, vertices_to_edges, error_probabilities, logical_operators, trials):
     error_percentages = []
     for ep in error_probabilities:
         print(f"Processing error probability {ep} for the graph with {periodic_graph.number_of_edges()} qubits")
@@ -864,74 +730,84 @@ def find_code_distance(logical_operators, periodic_graph):
 
 
 if __name__ == '__main__':
+    trials = 10000
     p = 8
     q = 3
     p_B = 8
     q_B = 8
 
-    if p_B == 8:
-        CT_matrices_dic = {
+    # Generated from GAP using LINS package
+    CT_matrices_dic = {
 
-            # Abelian Subgroup, NSG[365]
-            9: [[2, 3, 1, 6, 8, 9, 5, 7, 4],
-                [3, 1, 2, 9, 7, 4, 8, 5, 6],
-                [4, 6, 9, 5, 1, 8, 3, 2, 7],
-                [5, 8, 7, 1, 4, 2, 9, 6, 3],
-                [6, 9, 4, 8, 2, 7, 1, 3, 5],
-                [7, 5, 8, 3, 9, 1, 6, 4, 2],
-                [8, 7, 5, 2, 6, 3, 4, 9, 1],
-                [9, 4, 6, 7, 3, 5, 2, 1, 8]],
+        # Abelian Subgroup, NSG[365]
+        9: [[2, 3, 1, 6, 8, 9, 5, 7, 4],
+            [3, 1, 2, 9, 7, 4, 8, 5, 6],
+            [4, 6, 9, 5, 1, 8, 3, 2, 7],
+            [5, 8, 7, 1, 4, 2, 9, 6, 3],
+            [6, 9, 4, 8, 2, 7, 1, 3, 5],
+            [7, 5, 8, 3, 9, 1, 6, 4, 2],
+            [8, 7, 5, 2, 6, 3, 4, 9, 1],
+            [9, 4, 6, 7, 3, 5, 2, 1, 8]],
 
-            # Abelian Subgroup, NSG[2872]
-            12: [[2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8],
-                 [3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9],
-                 [4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5],
-                 [5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4],
-                 [6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11],
-                 [7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10],
-                 [8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2],
-                 [9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3]],
+        # Abelian Subgroup, NSG[2872]
+        12: [[2, 10, 1, 6, 11, 9, 5, 7, 12, 4, 3, 8],
+                [3, 1, 11, 10, 7, 4, 8, 12, 6, 2, 5, 9],
+                [4, 6, 10, 12, 1, 8, 3, 11, 7, 9, 2, 5],
+                [5, 11, 7, 1, 12, 2, 9, 6, 10, 3, 8, 4],
+                [6, 9, 4, 8, 2, 7, 1, 3, 5, 12, 10, 11],
+                [7, 5, 8, 3, 9, 1, 6, 4, 2, 11, 12, 10],
+                [8, 7, 12, 11, 6, 3, 4, 10, 1, 5, 9, 2],
+                [9, 12, 6, 7, 10, 5, 2, 1, 11, 8, 4, 3]],
 
-            # Abelian Subgroup, NSG[10425]
-            16: [[2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8],
-                 [3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9],
-                 [4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12],
-                 [5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13],
-                 [6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14],
-                 [7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11],
-                 [8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2],
-                 [9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3]]
-        }
+        # Abelian Subgroup, NSG[10425]
+        16: [[2, 10, 1, 11, 12, 13, 14, 15, 16, 3, 6, 7, 4, 5, 9, 8],
+                [3, 1, 10, 13, 14, 11, 12, 16, 15, 2, 4, 5, 6, 7, 8, 9],
+                [4, 11, 13, 8, 1, 9, 10, 7, 5, 6, 15, 2, 16, 3, 14, 12],
+                [5, 12, 14, 1, 9, 10, 8, 4, 6, 7, 2, 16, 3, 15, 11, 13],
+                [6, 13, 11, 9, 10, 8, 1, 5, 7, 4, 16, 3, 15, 2, 12, 14],
+                [7, 14, 12, 10, 8, 1, 9, 6, 4, 5, 3, 15, 2, 16, 13, 11],
+                [8, 15, 16, 7, 4, 5, 6, 10, 1, 9, 14, 11, 12, 13, 3, 2],
+                [9, 16, 15, 5, 6, 7, 4, 1, 10, 8, 12, 13, 14, 11, 2, 3]]
+    }
 
-    plt.figure(figsize=(10, 10))
+    extra_generators_indices = {
+        9: [],
+        12: [(1, 2), (0, 3), (2, 2)],
+        16: [(5, 2), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0)],
+    }
 
-    colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']
     error_probabilities = [0.01 * j for j in range(28)]
+    error_percentages = []
+    all_params = []
     for idx, N in enumerate(CT_matrices_dic):
-        G_vertices = generate_vertices(p, q, p_B, q_B, N)
+        G_vertices = generate_vertices(p, q, p_B, q_B, N, extra_generators_indices[N])
 
         G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, draw=True)
         
         sparse_matrix = create_sparse_matrix(adj_G, N, CT_matrices_dic[N], p_B, p, q)
 
-        periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict)
+        periodic_G = add_periodicity_edges(G, G_vertices_to_edges, G_edges_to_vertices, sparse_matrix, G_pos_dict, draw=False)
 
         HCB, all_faces, logical_operators = hyperbolic_cycle_basis(G, periodic_G, p, q)
-
         n = periodic_G.number_of_edges()
         k = 2 * (N + 1)
         encoding_rate = k / n
         d = find_code_distance(logical_operators, periodic_G)
+        all_params.append((n,k,d))
 
-        error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators)
+        error_percentage = error_graph(periodic_G, G_vertices_to_edges, error_probabilities, logical_operators, trials)
+        error_percentages.append(error_percentage)
 
+    plt.figure(figsize=(10, 10))
+    colors = ['b', 'r', 'g', 'c', 'm', 'y', 'k']
+    for i, error_percentage in enumerate(error_percentages):
+        n,k,d = all_params[i]
         plt.plot(error_probabilities, error_percentage, marker='o', linestyle='-',
-                 color=colors[idx % len(colors)], label=f'[[n={n}, k={k}, d={d}]]')
-
+                    color=colors[i % len(colors)], label=f'[[n={n}, k={k}, d={d}]]')
 
     plt.xlabel('Physical Error Probabilities')
     plt.ylabel('Logical Error Probabilities')
-    plt.title('{8,3} HQECC Error Threshold Graph')
+    plt.title(f"{{{p,q}}} HQECC Error Threshold Graph")
     plt.legend()
     plt.grid(True)
     end = time.time()
