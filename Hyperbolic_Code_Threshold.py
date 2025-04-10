@@ -782,7 +782,7 @@ if __name__ == '__main__':
     for idx, N in enumerate(CT_matrices_dic):
         G_vertices = generate_vertices(p, q, p_B, q_B, N, extra_generators_indices[N])
 
-        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, draw=True)
+        G, adj_G, G_vertices_to_edges, G_edges_to_vertices, G_pos_dict = generate_hyperbolic_graph(G_vertices, draw=False)
         
         sparse_matrix = create_sparse_matrix(adj_G, N, CT_matrices_dic[N], p_B, p, q)
 
