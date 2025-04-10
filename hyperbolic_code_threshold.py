@@ -59,10 +59,12 @@ def unit_cell_positions(p: int, q: int):
 
 
 def rotation_matrix(phi: complex):
+    """ This function generates the rotation matrices used to generate the Fuchsian group generators; see eq (20) in the paper"""
     return np.array([[np.exp(1j * phi / 2), 0], [0, np.exp(-1j * phi / 2)]])
 
 
 def fuchsian_generators(p_B: int, q_B: int):
+    """ This function generates the generators of the Fuchsian group as well as their inverses and returns them in a list."""
     alpha = 2 * np.pi / p_B
     beta = 2 * np.pi / q_B
     sigma = np.sqrt((np.cos(alpha) + np.cos(beta)) / (1 + np.cos(beta)))
@@ -76,6 +78,7 @@ def fuchsian_generators(p_B: int, q_B: int):
 
 
 def create_new_vertex(vertex_position: complex, translation_matrix: np.array):
+    """ This function generates the position of the vertex produced by applying an element of the Fuchsian group to a vertex in the unit cell"""
     v = translation_matrix @ np.array([vertex_position, 1])
     new_vertex_position = v[0] / v[1]
     return new_vertex_position
