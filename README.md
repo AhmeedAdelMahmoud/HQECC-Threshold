@@ -1,7 +1,7 @@
 # HQECC-Threshold
 Hyperbolic Quantum Error Correction Codes Threshold. 
 
-This repository contains the accompanying source code for the paper "A Systematic Approach to Hyperbolic Quantum Error Correction Codes".
+This repository contains the accompanying source code for the paper [A Systematic Approach to Hyperbolic Quantum Error Correction Codes](https://arxiv.org/abs/2504.07800)
 
 ## Running the Python file
 It's recommended to use a version of python >= 3.10.6
